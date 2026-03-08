@@ -2,14 +2,14 @@ import * as THREE from 'three';
 import { TileState } from '../types/grid';
 
 const TILE_COLORS_LIGHT: Record<TileState, number> = {
-  [TileState.Default]:  0xa8c48a,
-  [TileState.Hover]:    0xf0e070,
+  [TileState.Default]:  0x2d3f5c,
+  [TileState.Hover]:    0x4a90d9,
   [TileState.Selected]: 0xf08844,
-  [TileState.Occupied]: 0xe8b84a,
+  [TileState.Occupied]: 0x3b6fa0,
 };
 
 const TILE_COLORS_DARK: Partial<Record<TileState, number>> = {
-  [TileState.Default]: 0x7a9e62,
+  [TileState.Default]:  0x1a2638,
 };
 
 class GridVisuals {
