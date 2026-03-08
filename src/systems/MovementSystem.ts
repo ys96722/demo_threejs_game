@@ -6,11 +6,17 @@ import type { GridCoord } from '../types/grid';
 
 export class MovementSystem {
   private grid: Grid;
-  private character: Character;
+  private getActiveCharacter: () => Character;
+  private isOccupied: (coord: GridCoord) => boolean;
 
-  constructor(grid: Grid, character: Character) {
+  constructor(
+    grid: Grid,
+    getActiveCharacter: () => Character,
+    isOccupied: (coord: GridCoord) => boolean
+  ) {
     this.grid = grid;
-    this.character = character;
+    this.getActiveCharacter = getActiveCharacter;
+    this.isOccupied = isOccupied;
 
     bus.on(EVENTS.TILE_CLICKED, this.handleTileClicked);
   }
@@ -20,11 +26,12 @@ export class MovementSystem {
   }
 
   private handleTileClicked = ({ coord }: { coord: GridCoord }): void => {
+    const activeChar = this.getActiveCharacter();
+    const from = activeChar.coord;
     if (!this.grid.isValid(coord)) return;
-    if (this.character.coord.col === coord.col && this.character.coord.row === coord.row) return;
-
-    const from = this.character.coord;
-    this.character.moveTo(coord);
+    if (coord.col === from.col && coord.row === from.row) return;
+    if (this.isOccupied(coord)) return;
+    activeChar.moveTo(coord);
     bus.emit(EVENTS.CHARACTER_MOVE_START, { from, to: coord });
-  }
+  };
 }
