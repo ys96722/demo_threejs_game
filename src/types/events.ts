@@ -7,6 +7,7 @@ export const EVENTS = {
   CHARACTER_MOVE_START: 'CHARACTER_MOVE_START',
   CHARACTER_MOVE_END: 'CHARACTER_MOVE_END',
   RENDERER_RESIZED: 'RENDERER_RESIZED',
+  TURN_CHANGED: 'TURN_CHANGED',
 } as const;
 
 export type EventPayloads = {
@@ -16,6 +17,7 @@ export type EventPayloads = {
   [EVENTS.CHARACTER_MOVE_START]: { from: GridCoord; to: GridCoord };
   [EVENTS.CHARACTER_MOVE_END]: { coord: GridCoord };
   [EVENTS.RENDERER_RESIZED]: { width: number; height: number };
+  [EVENTS.TURN_CHANGED]: { player: 1 | 2 };
 };
 
 export type EventName = keyof EventPayloads;

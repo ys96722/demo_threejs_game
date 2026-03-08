@@ -7,6 +7,7 @@ import { Grid } from '../world/Grid';
 import { Character } from '../entities/Character';
 import { InputManager } from '../input/InputManager';
 import { MovementSystem } from '../systems/MovementSystem';
+import { TurnManager } from './TurnManager';
 import { TileState } from '../types/grid';
 import type { GridCoord } from '../types/grid';
 
@@ -17,13 +18,17 @@ export class Game {
   private cameraController: CameraController;
   private scene: THREE.Scene;
   private grid: Grid;
-  private character: Character;
+  private char1: Character;
+  private char2: Character;
+  private turnManager: TurnManager;
   private inputManager: InputManager;
   private movementSystem: MovementSystem;
   private lastTime: number | null = null;
 
   private hoveredCoord: GridCoord | null = null;
   private selectedCoord: GridCoord | null = null;
+
+  private turnIndicator: HTMLDivElement;
 
   constructor() {
     this.renderer = new Renderer();
@@ -45,8 +50,19 @@ export class Game {
 
     // World
     this.grid = new Grid(this.scene);
-    this.character = new Character({ col: 3, row: 3 });
-    this.scene.add(this.character.group);
+
+    // Characters
+    this.char1 = new Character(1, { col: 1, row: 1 });
+    this.char2 = new Character(2, { col: 6, row: 6 });
+    this.scene.add(this.char1.group);
+    this.scene.add(this.char2.group);
+
+    // Mark starting tiles as Occupied
+    this.grid.getTile({ col: 1, row: 1 })?.setState(TileState.Occupied);
+    this.grid.getTile({ col: 6, row: 6 })?.setState(TileState.Occupied);
+
+    // Turn manager
+    this.turnManager = new TurnManager();
 
     // Systems
     this.inputManager = new InputManager(
@@ -54,7 +70,11 @@ export class Game {
       this.cameraController.camera,
       this.grid.tileMeshes
     );
-    this.movementSystem = new MovementSystem(this.grid, this.character);
+    this.movementSystem = new MovementSystem(
+      this.grid,
+      this.getActiveCharacter,
+      this.isOccupied
+    );
 
     // Event subscriptions
     bus.on(EVENTS.TILE_HOVER_ENTER, ({ coord }) => {
@@ -75,11 +95,13 @@ export class Game {
       }
     });
 
-    bus.on(EVENTS.CHARACTER_MOVE_START, ({ to }) => {
+    bus.on(EVENTS.CHARACTER_MOVE_START, ({ from, to }) => {
+      // Clear source tile
+      this.grid.getTile(from)?.setState(TileState.Default);
       // Clear previous selected tile
       if (this.selectedCoord) {
         const prev = this.grid.getTile(this.selectedCoord);
-        if (prev) prev.setState(TileState.Default);
+        if (prev && prev.state === TileState.Selected) prev.setState(TileState.Default);
       }
       this.selectedCoord = to;
       const tile = this.grid.getTile(to);
@@ -89,12 +111,47 @@ export class Game {
     bus.on(EVENTS.CHARACTER_MOVE_END, ({ coord }) => {
       const tile = this.grid.getTile(coord);
       if (tile) tile.setState(TileState.Occupied);
+      this.turnManager.nextTurn();
     });
 
-    this.character.onMoveComplete = (coord) => {
+    bus.on(EVENTS.TURN_CHANGED, ({ player }) => {
+      this.turnIndicator.textContent = `Player ${player}'s Turn`;
+    });
+
+    this.char1.onMoveComplete = (coord) => {
       bus.emit(EVENTS.CHARACTER_MOVE_END, { coord });
     };
+    this.char2.onMoveComplete = (coord) => {
+      bus.emit(EVENTS.CHARACTER_MOVE_END, { coord });
+    };
+
+    // Turn indicator DOM overlay
+    this.turnIndicator = document.createElement('div');
+    this.turnIndicator.id = 'turn-indicator';
+    this.turnIndicator.textContent = "Player 1's Turn";
+    Object.assign(this.turnIndicator.style, {
+      position: 'fixed',
+      top: '16px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      color: '#ffffff',
+      background: 'rgba(0,0,0,0.55)',
+      padding: '6px 18px',
+      borderRadius: '6px',
+      fontSize: '16px',
+      fontFamily: 'sans-serif',
+      pointerEvents: 'none',
+      zIndex: '100',
+    });
+    document.body.appendChild(this.turnIndicator);
   }
+
+  private getActiveCharacter = (): Character =>
+    this.turnManager.activePlayer === 1 ? this.char1 : this.char2;
+
+  private isOccupied = (coord: GridCoord): boolean =>
+    (coord.col === this.char1.coord.col && coord.row === this.char1.coord.row) ||
+    (coord.col === this.char2.coord.col && coord.row === this.char2.coord.row);
 
   start(): void {
     requestAnimationFrame(this.loop);
@@ -103,6 +160,7 @@ export class Game {
   dispose(): void {
     this.inputManager.dispose();
     this.movementSystem.dispose();
+    this.turnIndicator.remove();
   }
 
   private loop = (timestamp: number): void => {
@@ -111,7 +169,8 @@ export class Game {
     const dt = this.lastTime === null ? 0 : Math.min((timestamp - this.lastTime) / 1000, MAX_DT);
     this.lastTime = timestamp;
 
-    this.character.update(dt);
+    this.char1.update(dt);
+    this.char2.update(dt);
     this.renderer.render(this.scene, this.cameraController.camera);
   };
 }
