@@ -5,13 +5,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "screenshot": "node scripts/screenshot.mjs"
   },
   "dependencies": {
     "three": "^0.171.0"
   },
   "devDependencies": {
     "@types/three": "^0.171.0",
+    "playwright": "^1.58.2",
     "typescript": "^5.7.3",
     "vite": "^6.1.0"
   }
