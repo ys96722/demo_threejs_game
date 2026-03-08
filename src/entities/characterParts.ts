@@ -129,7 +129,7 @@ export function makeEnergyBlade(tileTop: number): THREE.Group {
   const group = new THREE.Group();
   const blade = new THREE.Mesh(
     new THREE.BoxGeometry(0.06, 0.55, 0.015),
-    new THREE.MeshToonMaterial({ color: 0x60a5fa, emissive: new THREE.Color(0x1e40af), emissiveIntensity: 1.2 })
+    new THREE.MeshToonMaterial({ color: 0x60a5fa, emissive: new THREE.Color(0x1e40af), emissiveIntensity: 0.6 })
   );
   blade.castShadow = true;
   blade.position.set(0.22, tileTop + 0.50, 0);
