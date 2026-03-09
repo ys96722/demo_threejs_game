@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm run dev        # Start dev server at localhost:5173
 npm run build      # Type-check (tsc) then bundle (vite build)
 npm run preview    # Serve the production build
-npm run screenshot # Capture before/after screenshots via Playwright
+npm run screenshot # Capture a single screenshot (low-level utility)
+npm run create-pr  # Capture before/after screenshots, commit, push, and open PR
 ```
 
 There are no tests. TypeScript type-checking (`tsc --noEmit`) is the primary correctness check, run implicitly by `npm run build`.
@@ -37,4 +38,4 @@ There are no tests. TypeScript type-checking (`tsc --noEmit`) is the primary cor
 
 ## Pull Requests
 
-Every PR must include before and after screenshots of the game screen. Attach them in the PR description under a "## Screenshots" section with "Before" and "After" labels. Use `npm run screenshot` to capture them.
+Every PR must include before and after screenshots of the game screen. Run `npm run create-pr` to capture before/after screenshots, commit them, push the branch, and open the PR in one step. Pass `--title "…"` to set the PR title non-interactively.

@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "screenshot": "node scripts/screenshot.mjs"
+    "screenshot": "node scripts/screenshot.mjs",
+    "create-pr": "node scripts/create-pr.mjs"
   },
   "dependencies": {
     "three": "^0.171.0"
