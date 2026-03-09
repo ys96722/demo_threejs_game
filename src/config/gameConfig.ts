@@ -1,8 +1,8 @@
 import type { CharacterConfig } from '../types/characters';
 
 export const characters: CharacterConfig[] = [
-  { playerIndex: 1, name: 'Seonjae', startCoord: { col: 1, row: 1 }, moveRange: 6, spritePath: '/textures/seonjae_base.png' },
-  { playerIndex: 2, name: 'Mina',    startCoord: { col: 6, row: 6 }, moveRange: 4, spritePath: '/textures/mina_base.png' },
+  { playerIndex: 1, name: 'Seonjae', startCoord: { col: 1, row: 1 }, moveRange: 6, spritePath: '/textures/seonjae_base.png', hp: 100, strength: 10, intellect: 8, defense: 1, resistance: 1, attackRange: 2, skills: [{ name: 'Reveille of Black Cranes', range: 3 }] },
+  { playerIndex: 2, name: 'Mina',    startCoord: { col: 6, row: 6 }, moveRange: 4, spritePath: '/textures/mina_base.png',    hp: 100, strength: 1,  intellect: 1, defense: 1, resistance: 1, attackRange: 1, skills: [{ name: 'Abrazo o Desprecio (Embrace or Exile)', range: 3 }] },
 ];
 
 export const gameConfig = {
