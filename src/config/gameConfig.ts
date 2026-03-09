@@ -1,35 +1,31 @@
 export const gameConfig = {
+  character: {
+    spriteScale: 2.0,
+  },
   grid: {
-    cols: 8,
-    rows: 8,
+    cols: 10, // 8
+    rows: 10, // 8
     tileSize: 1.0,
     tileGap: 0.04,
     tileHeight: 0.12,
   },
   camera: {
     frustumSize: 14,
-    elevation: 60,
-    azimuth: 45,
+    elevation: 80, // 60
+    azimuth: 0, // 45
     near: 0.1,
     far: 100,
   },
   movement: {
-    animationDuration: 0.35,
+    animationDuration: 0.8, // 0.35
     hopHeight: 0.3,
   },
   vfx: {
     idleBobSpeed:       1.8,
-    idleBobAmplitude:   0.04,
-    slashRingSpeed:     2.2,
-    p1LightColor:       0x60a5fa,
-    p1LightIntensity:   3.5,
-    p1LightDistance:    3.5,
-    p2LightColor:       0xd946ef,
-    p2LightIntensity:   3.5,
-    p2LightDistance:    3.5,
-    bloomStrength:      0.4,
-    bloomRadius:        0.3,
-    bloomThreshold:     0.35,
+    idleBobAmplitude:   1, // 0.04
+    bloomStrength:      0.15,
+    bloomRadius:        0.2,
+    bloomThreshold:     0.65,
   },
   scene: {
     background:         0x030712,

@@ -30,8 +30,6 @@ export class Game {
   private movementSystem: MovementSystem;
   private lastTime: number | null = null;
   private composer: EffectComposer;
-  private p1Light: THREE.PointLight;
-  private p2Light: THREE.PointLight;
 
   private hoveredCoord: GridCoord | null = null;
   private selectedCoord: GridCoord | null = null;
@@ -60,21 +58,6 @@ export class Game {
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
     this.scene.add(dirLight);
-
-    // Per-character point lights
-    this.p1Light = new THREE.PointLight(
-      gameConfig.vfx.p1LightColor,
-      gameConfig.vfx.p1LightIntensity,
-      gameConfig.vfx.p1LightDistance
-    );
-    this.scene.add(this.p1Light);
-
-    this.p2Light = new THREE.PointLight(
-      gameConfig.vfx.p2LightColor,
-      gameConfig.vfx.p2LightIntensity,
-      gameConfig.vfx.p2LightDistance
-    );
-    this.scene.add(this.p2Light);
 
     // World
     this.grid = new Grid(this.scene);
@@ -212,17 +195,6 @@ export class Game {
 
     this.char1.update(dt);
     this.char2.update(dt);
-
-    this.p1Light.position.set(
-      this.char1.group.position.x,
-      this.char1.group.position.y + 0.8,
-      this.char1.group.position.z
-    );
-    this.p2Light.position.set(
-      this.char2.group.position.x,
-      this.char2.group.position.y + 0.8,
-      this.char2.group.position.z
-    );
 
     this.composer.render();
   };
