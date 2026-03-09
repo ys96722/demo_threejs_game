@@ -243,9 +243,11 @@ async function main() {
 
   const screenshotsSection = `## Screenshots
 
-| Before | After |
-|--------|-------|
-| ![Before](${beforeUrl}) | ![After](${afterUrl}) |
+**Before**
+![Before](${beforeUrl})
+
+**After**
+![After](${afterUrl})
 `;
 
   const body = `${extraBody}${screenshotsSection}`;
