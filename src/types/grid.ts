@@ -4,8 +4,9 @@ export interface GridCoord {
 }
 
 export enum TileState {
-  Default = 'default',
-  Hover = 'hover',
-  Selected = 'selected',
-  Occupied = 'occupied',
+  Default   = 'default',
+  Hover     = 'hover',
+  Selected  = 'selected',
+  Occupied  = 'occupied',
+  Reachable = 'reachable',
 }

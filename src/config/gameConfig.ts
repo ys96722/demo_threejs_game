@@ -1,3 +1,10 @@
+import type { CharacterConfig } from '../types/characters';
+
+export const characters: CharacterConfig[] = [
+  { playerIndex: 1, name: 'Seonjae', startCoord: { col: 1, row: 1 }, moveRange: 6, spritePath: '/textures/seonjae_base.png' },
+  { playerIndex: 2, name: 'Mina',    startCoord: { col: 6, row: 6 }, moveRange: 4, spritePath: '/textures/mina_base.png' },
+];
+
 export const gameConfig = {
   character: {
     spriteScale: 2.0,

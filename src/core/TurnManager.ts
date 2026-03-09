@@ -1,13 +1,22 @@
 import { bus } from './EventBus';
 import { EVENTS } from '../types/events';
 
-export type PlayerIndex = 1 | 2;
+export type PlayerIndex = number;
 
 export class TurnManager {
-  activePlayer: PlayerIndex = 1;
+  private playerIndices: number[];
+  private currentIndex = 0;
+
+  constructor(playerIndices: number[]) {
+    this.playerIndices = playerIndices;
+  }
+
+  get activePlayer(): number {
+    return this.playerIndices[this.currentIndex];
+  }
 
   nextTurn(): void {
-    this.activePlayer = this.activePlayer === 1 ? 2 : 1;
+    this.currentIndex = (this.currentIndex + 1) % this.playerIndices.length;
     bus.emit(EVENTS.TURN_CHANGED, { player: this.activePlayer });
   }
 }

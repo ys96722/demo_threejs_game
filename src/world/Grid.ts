@@ -31,4 +31,8 @@ export class Grid {
     const { cols, rows } = gameConfig.grid;
     return coord.col >= 0 && coord.col < cols && coord.row >= 0 && coord.row < rows;
   }
+
+  allTiles(): Tile[] {
+    return this.tiles.flat();
+  }
 }
