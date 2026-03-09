@@ -57,6 +57,8 @@ export class InputManager {
     const result = this.getTileAtPointer();
     if (result) {
       bus.emit(EVENTS.TILE_CLICKED, { coord: result.coord });
+    } else {
+      bus.emit(EVENTS.CANVAS_CLICKED_EMPTY, {});
     }
   };
 

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Tile } from '../world/Tile';
 import { CharacterAnimator } from './CharacterAnimator';
 import type { GridCoord } from '../types/grid';
-import type { CharacterConfig } from '../types/characters';
+import type { CharacterConfig, SkillDef } from '../types/characters';
 import { gameConfig } from '../config/gameConfig';
 
 const loader = new THREE.TextureLoader();
@@ -89,6 +89,32 @@ export class Character {
   private animator: CharacterAnimator;
   coord: GridCoord; // current grid position (updated immediately when a move starts)
   onMoveComplete: ((coord: GridCoord) => void) | null = null;
+  moveTokens: number = 1;
+  actionTokens: number = 1;
+
+  // Stats
+  hp: number;
+  readonly maxHp: number;
+  readonly strength: number;
+  readonly intellect: number;
+  readonly defense: number;
+  readonly resistance: number;
+  readonly attackRange: number;
+  readonly skills: SkillDef[];
+
+  // Selection glow sprite
+  private selectionGlow: THREE.Sprite;
+
+  // Token indicator sprite (stored for visibility toggling)
+  private tokenSprite: THREE.Sprite;
+
+  // Health bar
+  private healthBarCanvas: HTMLCanvasElement;
+  private healthBarTexture: THREE.CanvasTexture;
+
+  // Token indicator
+  private tokenCanvas: HTMLCanvasElement;
+  private tokenTexture: THREE.CanvasTexture;
 
   // Accumulates elapsed time while the character is idle so the bob animation
   // progresses continuously between moves.
@@ -99,6 +125,14 @@ export class Character {
     this.name = config.name;
     this.moveRange = config.moveRange;
     this.coord = config.startCoord;
+    this.hp = config.hp;
+    this.maxHp = config.hp;
+    this.strength = config.strength;
+    this.intellect = config.intellect;
+    this.defense = config.defense;
+    this.resistance = config.resistance;
+    this.attackRange = config.attackRange;
+    this.skills = config.skills;
     this.group = new THREE.Group();
     this.animator = new CharacterAnimator();
 
@@ -116,8 +150,57 @@ export class Character {
     sprite.position.y = gameConfig.grid.tileHeight;
 
     const s = gameConfig.character.spriteScale;
+
+    // Selection glow — same texture, slightly larger, additive blending with HDR warm color.
+    // Rendered before the main sprite (renderOrder 0) so the main sprite draws cleanly on top.
+    // HDR color values (> 1) exceed the bloom threshold and trigger UnrealBloomPass.
+    const glowMat = new THREE.SpriteMaterial({
+      map: texture,
+      color: new THREE.Color(1.8, 1.4, 0.6),
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+    });
+    this.selectionGlow = new THREE.Sprite(glowMat);
+    this.selectionGlow.center.set(0.5, 0);
+    this.selectionGlow.position.y = gameConfig.grid.tileHeight;
+    this.selectionGlow.scale.set(s * 1.25, s * 1.25, 1);
+    this.selectionGlow.visible = false;
+    this.group.add(this.selectionGlow);
+
     sprite.scale.set(s, s, 1);
+    sprite.renderOrder = 1; // draw on top of glow
     this.group.add(sprite);
+
+    // Health bar — canvas texture on a billboard sprite, positioned above the character sprite.
+    // The character sprite is bottom-anchored at tileHeight and scaled to s world units tall,
+    // so its top sits at roughly tileHeight + s in local y. Add a small gap above that.
+    this.healthBarCanvas = document.createElement('canvas');
+    this.healthBarCanvas.width = 128;
+    this.healthBarCanvas.height = 16;
+    this.healthBarTexture = new THREE.CanvasTexture(this.healthBarCanvas);
+    const hbMat = new THREE.SpriteMaterial({ map: this.healthBarTexture, depthTest: false });
+    const hbSprite = new THREE.Sprite(hbMat);
+    hbSprite.renderOrder = 1;
+    // Width = 1.2 world units, height = 0.15 world units (matches 128:16 canvas ratio ≈ 8:1)
+    hbSprite.scale.set(1.2, 0.15, 1);
+    hbSprite.position.y = gameConfig.grid.tileHeight + s + 0.2;
+    this.group.add(hbSprite);
+    this.drawHealthBar();
+
+    // Token indicator — two dots above the health bar, guaranteed on top via renderOrder.
+    this.tokenCanvas = document.createElement('canvas');
+    this.tokenCanvas.width = 48;
+    this.tokenCanvas.height = 20;
+    this.tokenTexture = new THREE.CanvasTexture(this.tokenCanvas);
+    const tokenMat = new THREE.SpriteMaterial({ map: this.tokenTexture, depthTest: false });
+    this.tokenSprite = new THREE.Sprite(tokenMat);
+    this.tokenSprite.renderOrder = 2;
+    this.tokenSprite.scale.set(0.6, 0.24, 1);
+    this.tokenSprite.position.y = gameConfig.grid.tileHeight + s + 0.42;
+    this.tokenSprite.visible = false; // hidden until this player's turn
+    this.group.add(this.tokenSprite);
+    this.updateTokenDisplay();
 
     const worldPos = Tile.gridToWorld(config.startCoord);
     this.group.position.set(worldPos.x, 0, worldPos.z);
@@ -125,6 +208,69 @@ export class Character {
     this.animator.onComplete = () => {
       this.onMoveComplete?.(this.coord);
     };
+  }
+
+  private drawHealthBar(): void {
+    const ctx = this.healthBarCanvas.getContext('2d')!;
+    const { width, height } = this.healthBarCanvas;
+    const fraction = Math.max(0, this.hp / this.maxHp);
+
+    // Background
+    ctx.fillStyle = '#1a0000';
+    ctx.fillRect(0, 0, width, height);
+
+    // Foreground — green above 50%, yellow above 25%, red below
+    ctx.fillStyle = fraction > 0.5 ? '#22c55e' : fraction > 0.25 ? '#eab308' : '#ef4444';
+    ctx.fillRect(0, 0, Math.floor(width * fraction), height);
+
+    this.healthBarTexture.needsUpdate = true;
+  }
+
+  setHp(value: number): void {
+    this.hp = Math.max(0, Math.min(this.maxHp, value));
+    this.drawHealthBar();
+  }
+
+  setSelected(selected: boolean): void {
+    this.selectionGlow.visible = selected;
+  }
+
+  setTokensVisible(visible: boolean): void {
+    this.tokenSprite.visible = visible;
+  }
+
+  updateTokenDisplay(): void {
+    const ctx = this.tokenCanvas.getContext('2d')!;
+    const { width, height } = this.tokenCanvas;
+    ctx.clearRect(0, 0, width, height);
+
+    // Left dot = move token (blue), right dot = action token (yellow)
+    const dots = [
+      { x: 12, color: '#60a5fa', spent: this.moveTokens === 0 },
+      { x: 36, color: '#fbbf24', spent: this.actionTokens === 0 },
+    ];
+
+    for (const { x, color, spent } of dots) {
+      const r = 8;
+      ctx.beginPath();
+      ctx.arc(x, height / 2, r, 0, Math.PI * 2);
+      if (spent) {
+        ctx.strokeStyle = '#555555';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+    }
+
+    this.tokenTexture.needsUpdate = true;
+  }
+
+  resetTurn(): void {
+    this.moveTokens = 1;
+    this.actionTokens = 1;
+    this.updateTokenDisplay();
   }
 
   moveTo(coord: GridCoord): void {
