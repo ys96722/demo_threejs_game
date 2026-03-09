@@ -14,7 +14,7 @@ import { MovementSystem } from '../systems/MovementSystem';
 import { TurnManager } from './TurnManager';
 import { TileState } from '../types/grid';
 import type { GridCoord } from '../types/grid';
-import { gameConfig } from '../config/gameConfig';
+import { gameConfig, characters as characterConfigs } from '../config/gameConfig';
 
 const MAX_DT = 0.1;
 
@@ -23,8 +23,7 @@ export class Game {
   private cameraController: CameraController;
   private scene: THREE.Scene;
   private grid: Grid;
-  private char1: Character;
-  private char2: Character;
+  private characters: Map<number, Character> = new Map();
   private turnManager: TurnManager;
   private inputManager: InputManager;
   private movementSystem: MovementSystem;
@@ -33,6 +32,7 @@ export class Game {
 
   private hoveredCoord: GridCoord | null = null;
   private selectedCoord: GridCoord | null = null;
+  private reachableCoords = new Set<string>();
 
   private turnIndicator: HTMLDivElement;
 
@@ -62,18 +62,17 @@ export class Game {
     // World
     this.grid = new Grid(this.scene);
 
-    // Characters
-    this.char1 = new Character(1, { col: 1, row: 1 });
-    this.char2 = new Character(2, { col: 6, row: 6 });
-    this.scene.add(this.char1.group);
-    this.scene.add(this.char2.group);
-
-    // Mark starting tiles as Occupied
-    this.grid.getTile({ col: 1, row: 1 })?.setState(TileState.Occupied);
-    this.grid.getTile({ col: 6, row: 6 })?.setState(TileState.Occupied);
+    // Characters — built from config; adding a 3rd character only requires a config entry
+    for (const cfg of characterConfigs) {
+      const char = new Character(cfg);
+      this.characters.set(cfg.playerIndex, char);
+      this.scene.add(char.group);
+      this.grid.getTile(cfg.startCoord)?.setState(TileState.Occupied);
+      char.onMoveComplete = (coord) => bus.emit(EVENTS.CHARACTER_MOVE_END, { coord });
+    }
 
     // Turn manager
-    this.turnManager = new TurnManager();
+    this.turnManager = new TurnManager(characterConfigs.map(c => c.playerIndex));
 
     // Systems
     this.inputManager = new InputManager(
@@ -91,22 +90,31 @@ export class Game {
     bus.on(EVENTS.TILE_HOVER_ENTER, ({ coord }) => {
       if (this.hoveredCoord) {
         const prev = this.grid.getTile(this.hoveredCoord);
-        if (prev && prev.state === TileState.Hover) prev.setState(TileState.Default);
+        if (prev && prev.state === TileState.Hover) {
+          const key = `${this.hoveredCoord.col},${this.hoveredCoord.row}`;
+          prev.setState(this.reachableCoords.has(key) ? TileState.Reachable : TileState.Default);
+        }
       }
       this.hoveredCoord = coord;
       const tile = this.grid.getTile(coord);
-      if (tile && tile.state === TileState.Default) tile.setState(TileState.Hover);
+      if (tile && (tile.state === TileState.Default || tile.state === TileState.Reachable)) {
+        tile.setState(TileState.Hover);
+      }
     });
 
     bus.on(EVENTS.TILE_HOVER_EXIT, ({ coord }) => {
       const tile = this.grid.getTile(coord);
-      if (tile && tile.state === TileState.Hover) tile.setState(TileState.Default);
+      if (tile && tile.state === TileState.Hover) {
+        const key = `${coord.col},${coord.row}`;
+        tile.setState(this.reachableCoords.has(key) ? TileState.Reachable : TileState.Default);
+      }
       if (this.hoveredCoord?.col === coord.col && this.hoveredCoord?.row === coord.row) {
         this.hoveredCoord = null;
       }
     });
 
     bus.on(EVENTS.CHARACTER_MOVE_START, ({ from, to }) => {
+      this.clearReachable();
       this.grid.getTile(from)?.setState(TileState.Default);
       if (this.selectedCoord) {
         const prev = this.grid.getTile(this.selectedCoord);
@@ -124,19 +132,14 @@ export class Game {
     });
 
     bus.on(EVENTS.TURN_CHANGED, ({ player }) => {
-      this.turnIndicator.textContent = `Player ${player}'s Turn`;
+      const char = this.characters.get(player);
+      this.turnIndicator.textContent = char ? `${char.name}'s Turn` : `Player ${player}'s Turn`;
+      this.showReachable(this.getActiveCharacter());
     });
 
     bus.on(EVENTS.RENDERER_RESIZED, ({ width, height }) => {
       this.composer.setSize(width, height);
     });
-
-    this.char1.onMoveComplete = (coord) => {
-      bus.emit(EVENTS.CHARACTER_MOVE_END, { coord });
-    };
-    this.char2.onMoveComplete = (coord) => {
-      bus.emit(EVENTS.CHARACTER_MOVE_END, { coord });
-    };
 
     // Post-processing
     this.composer = new EffectComposer(this.renderer.renderer);
@@ -150,9 +153,10 @@ export class Game {
     this.composer.addPass(new OutputPass());
 
     // Turn indicator DOM overlay
+    const firstChar = this.characters.get(characterConfigs[0].playerIndex);
     this.turnIndicator = document.createElement('div');
     this.turnIndicator.id = 'turn-indicator';
-    this.turnIndicator.textContent = "Player 1's Turn";
+    this.turnIndicator.textContent = firstChar ? `${firstChar.name}'s Turn` : "Player 1's Turn";
     Object.assign(this.turnIndicator.style, {
       position: 'fixed',
       top: '16px',
@@ -168,14 +172,37 @@ export class Game {
       zIndex: '100',
     });
     document.body.appendChild(this.turnIndicator);
+
+    // Show reachable tiles for the starting character
+    this.showReachable(this.getActiveCharacter());
   }
 
   private getActiveCharacter = (): Character =>
-    this.turnManager.activePlayer === 1 ? this.char1 : this.char2;
+    this.characters.get(this.turnManager.activePlayer)!;
 
   private isOccupied = (coord: GridCoord): boolean =>
-    (coord.col === this.char1.coord.col && coord.row === this.char1.coord.row) ||
-    (coord.col === this.char2.coord.col && coord.row === this.char2.coord.row);
+    [...this.characters.values()].some(c => c.coord.col === coord.col && c.coord.row === coord.row);
+
+  private showReachable(char: Character): void {
+    this.clearReachable();
+    for (const tile of this.grid.allTiles()) {
+      const { col, row } = tile.coord;
+      const dist = Math.abs(col - char.coord.col) + Math.abs(row - char.coord.row);
+      if (dist > 0 && dist <= char.moveRange && tile.state !== TileState.Occupied) {
+        tile.setState(TileState.Reachable);
+        this.reachableCoords.add(`${col},${row}`);
+      }
+    }
+  }
+
+  private clearReachable(): void {
+    for (const key of this.reachableCoords) {
+      const [col, row] = key.split(',').map(Number);
+      const tile = this.grid.getTile({ col, row });
+      if (tile && tile.state === TileState.Reachable) tile.setState(TileState.Default);
+    }
+    this.reachableCoords.clear();
+  }
 
   start(): void {
     requestAnimationFrame(this.loop);
@@ -193,8 +220,7 @@ export class Game {
     const dt = this.lastTime === null ? 0 : Math.min((timestamp - this.lastTime) / 1000, MAX_DT);
     this.lastTime = timestamp;
 
-    this.char1.update(dt);
-    this.char2.update(dt);
+    for (const char of this.characters.values()) char.update(dt);
 
     this.composer.render();
   };

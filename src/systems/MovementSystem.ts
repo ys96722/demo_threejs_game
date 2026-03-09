@@ -31,6 +31,8 @@ export class MovementSystem {
     if (!this.grid.isValid(coord)) return;
     if (coord.col === from.col && coord.row === from.row) return;
     if (this.isOccupied(coord)) return;
+    const dist = Math.abs(coord.col - from.col) + Math.abs(coord.row - from.row);
+    if (dist > activeChar.moveRange) return;
     activeChar.moveTo(coord);
     bus.emit(EVENTS.CHARACTER_MOVE_START, { from, to: coord });
   };

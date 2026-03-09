@@ -2,16 +2,10 @@ import * as THREE from 'three';
 import { Tile } from '../world/Tile';
 import { CharacterAnimator } from './CharacterAnimator';
 import type { GridCoord } from '../types/grid';
-import type { PlayerIndex } from '../core/TurnManager';
+import type { CharacterConfig } from '../types/characters';
 import { gameConfig } from '../config/gameConfig';
 
 const loader = new THREE.TextureLoader();
-
-// Maps each player slot to their sprite sheet PNG in /public/textures/.
-const SPRITE_TEXTURES: Record<PlayerIndex, string> = {
-  1: '/textures/seonjae_base.png',
-  2: '/textures/mina_base.png',
-};
 
 // Loads a sprite PNG and makes the white background transparent.
 //
@@ -88,7 +82,9 @@ function loadTransparentTexture(url: string): THREE.Texture {
 }
 
 export class Character {
-  readonly playerIndex: PlayerIndex;
+  readonly playerIndex: number;
+  readonly name: string;
+  readonly moveRange: number;
   readonly group: THREE.Group; // root transform; moved by the animator and idle bob
   private animator: CharacterAnimator;
   coord: GridCoord; // current grid position (updated immediately when a move starts)
@@ -98,13 +94,15 @@ export class Character {
   // progresses continuously between moves.
   private idleTime = 0;
 
-  constructor(playerIndex: PlayerIndex, startCoord: GridCoord) {
-    this.playerIndex = playerIndex;
-    this.coord = startCoord;
+  constructor(config: CharacterConfig) {
+    this.playerIndex = config.playerIndex;
+    this.name = config.name;
+    this.moveRange = config.moveRange;
+    this.coord = config.startCoord;
     this.group = new THREE.Group();
     this.animator = new CharacterAnimator();
 
-    const texture = loadTransparentTexture(SPRITE_TEXTURES[playerIndex]);
+    const texture = loadTransparentTexture(config.spritePath);
     const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
     const sprite = new THREE.Sprite(material);
 
@@ -121,7 +119,7 @@ export class Character {
     sprite.scale.set(s, s, 1);
     this.group.add(sprite);
 
-    const worldPos = Tile.gridToWorld(startCoord);
+    const worldPos = Tile.gridToWorld(config.startCoord);
     this.group.position.set(worldPos.x, 0, worldPos.z);
 
     this.animator.onComplete = () => {
