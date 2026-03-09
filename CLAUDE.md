@@ -47,5 +47,31 @@ Every PR must include before and after screenshots of the game screen. Run `npm 
 
 **When asked to create a PR and the current branch is `main`:**
 1. Create a new branch with a short descriptive name (e.g. `feature/skill-system`, `fix/attack-range-preview`)
-2. Stage and commit the relevant changes with a clear commit message describing what was done
-3. Push the branch and open the PR with a descriptive title and summary
+2. Stage and commit the relevant changes with clear, descriptive commit messages
+3. Run `npm run create-pr -- --title "…" --body "…"` with a thorough description (see below)
+
+**PR descriptions must be thorough.** Include:
+- A bullet-point summary of every feature, fix, or refactor
+- Why each change was made, not just what changed
+- Any architectural decisions or new patterns introduced
+- Known limitations or follow-up items if relevant
+
+```bash
+npm run create-pr -- \
+  --title "Short descriptive title" \
+  --body "$(cat <<'EOF'
+## Summary
+
+- Add X because Y; it lives in Z because it needs access to ...
+- Refactor A so that B; previously this caused ...
+- Fix bug where clicking outside the board did not deselect the character
+
+## Architecture notes
+
+- Skill effects are routed through SKILL_HIT so SelectionSystem stays decoupled from game logic
+
+## Follow-up
+- None
+EOF
+)"
+```
