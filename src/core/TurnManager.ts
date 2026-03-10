@@ -19,6 +19,6 @@ export class TurnManager {
   nextTurn(): void {
     this.currentIndex = (this.currentIndex + 1) % this.playerIndices.length;
     if (this.currentIndex === 0) this.turnCount += 1;
-    bus.emit(EVENTS.TURN_CHANGED, { player: this.activePlayer });
+    bus.emit(EVENTS.TURN_CHANGED, { player: this.activePlayer, turnCount: this.turnCount });
   }
 }

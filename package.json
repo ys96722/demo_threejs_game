@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "screenshot": "node scripts/screenshot.mjs",
-    "create-pr": "node scripts/create-pr.mjs"
+    "create-pr": "node scripts/create-pr.mjs",
+    "server": "cd server && uvicorn main:app --reload --port 8000"
   },
   "dependencies": {
     "three": "^0.171.0"

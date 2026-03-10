@@ -24,14 +24,14 @@ TypeScript type-checking (`tsc --noEmit`) is the primary build correctness check
 
 **Systems** (`src/systems/`) subscribe to bus events in their constructor and must call `bus.off(...)` in their `dispose()` method. Systems receive dependencies (grid, callbacks) injected from `Game` — they do not import `Game` directly.
 
-- `SelectionSystem` — manages character selection state, action panel UI, attack/skill targeting modes, range preview on button hover, and Web Audio API sounds (no audio files; sounds are synthesized). Emits `SKILL_HIT` with `{ casterIndex, skillName, targetCoord }` after validating range; `Game` applies the effect.
-- `MovementSystem` — validates and executes character movement on tile click.
+- `SelectionSystem` — manages character selection state, action panel UI, attack/skill targeting modes, range preview on button hover, and Web Audio API sounds (no audio files; sounds are synthesized). Emits intent events only (`ATTACK_INTENT`, `SKILL_HIT`, `SPEND_ACTION_INTENT`); `Game.ts` applies all state changes.
+- `MovementSystem` — validates movement on tile click and emits `MOVE_INTENT`; does not mutate character state.
 
 **Entities** (`src/entities/`) are Three.js objects. `Character` owns a `THREE.Group` containing: a character `Sprite`, a selection glow `Sprite` (same texture, additive blending, HDR color for bloom, hidden until selected), a health bar sprite, and a token indicator sprite. Characters are not aware of the grid or bus directly.
 
 Key `Character` methods: `setSelected(bool)` — shows/hides the bloom glow. `setTokensVisible(bool)` — tokens are only shown for the active player's characters. `setHp(value)` — clamps and redraws health bar. `updateTokenDisplay()` — redraws move/action token dots.
 
-**Skills** — defined as `SkillDef { name: string; range: number }` in `src/types/characters.ts`. Characters carry a `skills: SkillDef[]` array in their config. `SelectionSystem` shows skill buttons by name in the action panel (rebuilt per character in `showPanel`). Effect logic lives in `Game.ts` dispatched by `skillName` in the `SKILL_HIT` handler.
+**Skills** — defined as `SkillDef { name: string; range: number; targetType: 'enemy' | 'ally' | 'any' }` in `src/types/characters.ts`. Characters carry a `skills: SkillDef[]` array in their config. `SelectionSystem` shows skill buttons by name in the action panel (rebuilt per character in `showPanel`). Effect logic lives in `Game.ts` dispatched by `skillName` in the `SKILL_HIT` handler.
 
 **World** (`src/world/`) — `Grid` creates a 10×10 array of `Tile` objects. `Tile.gridToWorld()` converts `GridCoord → THREE.Vector3`: `x = (col - (cols-1)/2) * step`, `z = (row - (rows-1)/2) * step` where `step = tileSize + tileGap = 1.04`. Each tile mesh stores `mesh.userData['tile'] = this` for O(1) raycaster lookup. `GridVisuals` manages shared `MeshToonMaterial` instances per `TileState`.
 
@@ -40,6 +40,10 @@ Key `Character` methods: `setSelected(bool)` — shows/hides the bloom glow. `se
 **TypeScript strictness:** `strict: true`, `noUnusedLocals: true`, `noUnusedParameters: true`. Systems held as class fields that subscribe to bus events satisfy the "unused" check by virtue of being fields — but they must expose `dispose()`.
 
 **Post-processing:** `Game` uses Three.js `EffectComposer` (RenderPass → UnrealBloomPass → OutputPass). Call `composer.render()` instead of `renderer.render()` in the loop. The bloom threshold is 0.65 — use HDR color values (> 1.0 per channel) on `MeshBasicMaterial` or `SpriteMaterial` to guarantee bloom on emissive objects.
+
+## Multiplayer
+
+See **`MULTIPLAYER.md`** for the full multiplayer architecture reference — lobby flow, WebSocket protocol, `GameClient`, server file map, and future-work notes.
 
 ## Multiplayer Target Architecture
 
@@ -118,3 +122,27 @@ EOF
 4. Run `npm test` — all cases must pass before opening a PR
 
 **Future mechanics to anticipate:** debuffs (stat reduction), invincibility (block damage), range buffs (extend attackRange/moveRange), terrain effects, status effects (stun = 0 move tokens for N turns). Each needs a new function in `src/logic/` and a test matrix entry.
+
+## Verification
+
+### TypeScript
+- `npm run build` — tsc + vite build; must compile clean
+- `npm test` — Vitest; must pass all tests (currently 44)
+
+### Python server
+- `cd server && pip install -r requirements.txt`
+- `cd server && pytest` — must pass all tests (currently 77)
+
+### Manual E2E (multiplayer)
+1. `npm run server` (terminal 1)
+2. `npm run dev` (terminal 2)
+3. Open two browser tabs at `http://localhost:5173`
+4. Tab A: PvP → Create Lobby → note code
+5. Tab B: PvP → Join Lobby → enter code
+6. Both tabs show game board; Tab A is Team 1
+7. Tab A moves a character → Tab B sees the animation
+8. Tab A attacks → Tab B sees HP change
+9. Turn passes to Tab B → Tab A input is blocked
+
+### Solo (regression)
+- Click "Quick Test" → existing game works identically (no server needed)

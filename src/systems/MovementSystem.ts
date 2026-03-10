@@ -35,9 +35,6 @@ export class MovementSystem {
     if (this.isOccupied(coord)) return;
     const dist = Math.abs(coord.col - from.col) + Math.abs(coord.row - from.row);
     if (dist > selected.moveRange) return;
-    selected.moveTokens -= 1;
-    selected.updateTokenDisplay();
-    selected.moveTo(coord);
-    bus.emit(EVENTS.CHARACTER_MOVE_START, { from, to: coord });
+    bus.emit(EVENTS.MOVE_INTENT, { characterIndex: selected.playerIndex, from, to: coord });
   };
 }

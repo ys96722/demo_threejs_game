@@ -14,7 +14,7 @@ A turn-based strategy RPG (SRPG) demo built with **Vite + TypeScript (strict mod
 
 ```
 src/
-├── main.ts                        # Entry point — new Game(); game.start()
+├── main.ts                        # Entry point — mounts LobbyScreen; on game-ready calls new Game(mode).start()
 │
 ├── config/
 │   └── gameConfig.ts              # All constants + character definitions
@@ -27,6 +27,7 @@ src/
 ├── core/
 │   ├── EventBus.ts                # Typed pub/sub singleton (`bus`)
 │   ├── Game.ts                    # Scene graph, systems, render loop, event handlers
+│   ├── GameMode.ts                # Discriminated union: { kind: 'solo' } | { kind: 'pvp'; localTeam, ws }
 │   └── TurnManager.ts             # Tracks whose turn it is; cycles teams
 │
 ├── world/
@@ -47,7 +48,14 @@ src/
 │
 ├── systems/
 │   ├── SelectionSystem.ts         # Selection state, action panel UI, attack/skill targeting, sounds
-│   └── MovementSystem.ts          # Validates and executes character movement
+│   └── MovementSystem.ts          # Validates movement on tile click; emits MOVE_INTENT only
+│
+├── lobby/
+│   └── LobbyScreen.ts             # DOM state machine: MENU → PVP_MENU → WAITING → onGameReady(mode)
+│
+├── net/
+│   ├── GameClient.ts              # Owns WebSocket; translates server messages to bus events + Character calls
+│   └── protocol.ts                # TypeScript types for all WS messages (no runtime code)
 │
 └── logic/                         # Pure functions — no Three.js, no DOM, no bus
     ├── index.ts                   # Re-exports all logic functions
@@ -59,6 +67,17 @@ src/
         ├── displacement.test.ts
         ├── grid.test.ts
         └── movement.test.ts
+
+server/
+├── main.py                        # FastAPI app; HTTP lobby endpoints; WebSocket dispatch
+├── game_state.py                  # Authoritative GameState; apply_move/attack/skill/spend_action; turn mgmt
+├── game_logic.py                  # Pure functions — port of src/logic/
+├── lobby_manager.py               # In-memory lobby registry
+├── connection_manager.py          # WebSocket registry per lobby
+├── requirements.txt
+└── tests/
+    ├── test_game_logic.py         # Unit tests for pure logic functions (77 total)
+    └── test_game_state.py         # Unit tests for GameState action handlers
 ```
 
 ---
@@ -130,11 +149,15 @@ Systems subscribe to bus events in their constructor and **must** call `bus.off(
 - Rebuilds the HTML action panel per selected character (`showPanel()`)
 - Highlights reachable tiles, attack range tiles, and skill range tiles on hover
 - Synthesizes Web Audio API sounds (no audio files)
-- Emits `SKILL_HIT { casterIndex, skillName, targetCoord }` after validating range
-- `Game.ts` applies the actual effect in the `SKILL_HIT` handler
+- Emits **intent events only** — never mutates character state:
+  - `SKILL_HIT { casterIndex, skillName, targetCoord }` after validating skill range
+  - `SPEND_ACTION_INTENT { playerIndex }` when Transcend/Hold is clicked
+- `Game.ts` applies all effects and token changes in its event handlers
 
 **`MovementSystem`:**
-- Listens for `TILE_CLICKED`; if a character is selected and the tile is reachable, triggers `character.moveTo(dest)` and emits `CHARACTER_MOVE_START`
+- Listens for `TILE_CLICKED`; validates move range and occupancy
+- Emits `MOVE_INTENT { characterIndex, from, to }` — does **not** mutate character state
+- `Game.ts` applies the move (solo) or forwards to server (PvP)
 
 ### 10. Game — `src/core/Game.ts`
 The wiring layer. Owns the scene graph, instantiates all systems, runs the `requestAnimationFrame` loop, and implements all event handlers that require cross-system access.
@@ -168,16 +191,17 @@ Player hovers over an enemy tile
 Player clicks the enemy tile
   └─ InputManager → bus.emit(TILE_CLICKED, { coord })
        └─ SelectionSystem validates range (manhattanDist ≤ attackRange)
-            └─ bus.emit(SKILL_HIT, { casterIndex, skillName: 'attack', targetCoord })
-                 └─ Game.ts SKILL_HIT handler:
-                      1. finds caster and target Character objects
-                      2. calls computeAttackDamage(caster, target) → damage
+            └─ bus.emit(ATTACK_INTENT, { attackerIndex, targetCoord })
+                 └─ Game.ts ATTACK_INTENT handler (solo):
+                      1. finds attacker and target Character objects
+                      2. calls computeAttackDamage(attacker, target) → damage
                       3. calls target.setHp(target.hp - damage)
-                      4. bus.emit(ACTION_USED, { playerIndex: casterIndex })
-                           └─ SelectionSystem decrements action token, refreshes panel
+                      4. decrements attacker.actionTokens, zeros moveTokens
+                      5. bus.emit(ACTION_USED, { playerIndex: attackerIndex })
+                           └─ Game.ts checks turn end → TurnManager.nextTurn() if all tokens spent
 ```
 
-All payloads are plain JSON — serializable for future multiplayer networking.
+All payloads are plain JSON — serializable for multiplayer networking.
 
 ---
 

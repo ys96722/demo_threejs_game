@@ -22,6 +22,15 @@ export const EVENTS = {
   SKILL_HIT:                   'skill_hit',
   TARGET_PREVIEW_START:        'target_preview_start',
   TARGET_PREVIEW_END:          'target_preview_end',
+  // Network-level action intents — emitted locally, forwarded to server in PvP mode
+  ATTACK_INTENT:               'attack_intent',
+  MOVE_INTENT:                 'move_intent',
+  SPEND_ACTION_INTENT:         'spend_action_intent',
+  // Server-driven events
+  GAME_OVER:                   'game_over',
+  NETWORK_ACTION_REJECTED:     'network_action_rejected',
+  OPPONENT_DISCONNECTED:       'opponent_disconnected',
+  CHAT_RECEIVED:               'chat_received',
 } as const;
 
 export type EventPayloads = {
@@ -31,7 +40,7 @@ export type EventPayloads = {
   [EVENTS.CHARACTER_MOVE_START]: { from: GridCoord; to: GridCoord };
   [EVENTS.CHARACTER_MOVE_END]: { coord: GridCoord };
   [EVENTS.RENDERER_RESIZED]: { width: number; height: number };
-  [EVENTS.TURN_CHANGED]: { player: number };
+  [EVENTS.TURN_CHANGED]: { player: number; turnCount?: number };
   [EVENTS.CHARACTER_SELECTED]: { playerIndex: number; coord: GridCoord };
   [EVENTS.CHARACTER_DESELECTED]: { playerIndex: number };
   [EVENTS.ACTION_USED]: { playerIndex: number };
@@ -45,6 +54,13 @@ export type EventPayloads = {
   [EVENTS.SKILL_HIT]: { casterIndex: number; skillName: string; targetCoord: GridCoord };
   [EVENTS.TARGET_PREVIEW_START]: { targetPlayerIndex: number; preview: EffectPreview };
   [EVENTS.TARGET_PREVIEW_END]: { targetPlayerIndex: number };
+  [EVENTS.ATTACK_INTENT]: { attackerIndex: number; targetCoord: GridCoord };
+  [EVENTS.MOVE_INTENT]: { characterIndex: number; from: GridCoord; to: GridCoord };
+  [EVENTS.SPEND_ACTION_INTENT]: { playerIndex: number };
+  [EVENTS.GAME_OVER]: { winnerTeam: number };
+  [EVENTS.NETWORK_ACTION_REJECTED]: { reason: string };
+  [EVENTS.OPPONENT_DISCONNECTED]: Record<string, never>;
+  [EVENTS.CHAT_RECEIVED]: { team: number; text: string };
 };
 
 export type EventName = keyof EventPayloads;
