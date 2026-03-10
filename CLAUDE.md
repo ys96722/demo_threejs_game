@@ -41,11 +41,51 @@ Key `Character` methods: `setSelected(bool)` — shows/hides the bloom glow. `se
 
 **Post-processing:** `Game` uses Three.js `EffectComposer` (RenderPass → UnrealBloomPass → OutputPass). Call `composer.render()` instead of `renderer.render()` in the loop. The bloom threshold is 0.65 — use HDR color values (> 1.0 per channel) on `MeshBasicMaterial` or `SpriteMaterial` to guarantee bloom on emissive objects.
 
+## Multiplayer Target Architecture
+
+The long-term target is a two-player game where each player runs a **separate browser client** connected to a **shared authoritative server**. Keep the following in mind when making architectural decisions:
+
+- **Events as the network primitive.** The event bus already decouples actions from side effects. In multiplayer, player-action events (`TILE_CLICKED`, `CHARACTER_SELECTED`, etc.) will be forwarded over the network and applied on all clients. Design event payloads to be serializable (plain JSON — no class instances, no Three.js objects).
+
+- **Team = player session.** `character.team` maps directly to a connected player. `SelectionSystem.getOwnCharacterAtCoord` already encapsulates "only the local player can act on their own team's characters" — in multiplayer this becomes an authorization check: only emit actions for `localPlayerTeam`.
+
+- **Keep game logic in `Game.ts` event handlers.** Skill effects, movement validation, and turn management all live in `Game.ts` and are driven purely by events. This keeps them portable to a server-side authoritative model without restructuring.
+
+- **Avoid direct mutation outside events.** Never mutate character state or tile state outside of a bus event handler — this ensures all state changes can be replayed from an event log.
+
+- **Local player concept.** When multiplayer is implemented, `Game` (or a future `GameClient`) will receive a `localTeam: number` at construction to gate which inputs are forwarded to the server.
+
 ## Pull Requests
 
 Every PR must include before and after screenshots of the game screen. Run `npm run create-pr` to capture before/after screenshots, commit them, push the branch, and open the PR in one step. Pass `--title "…"` to set the PR title non-interactively.
 
 **When asked to create a PR and the current branch is `main`:**
 1. Create a new branch with a short descriptive name (e.g. `feature/skill-system`, `fix/attack-range-preview`)
-2. Stage and commit the relevant changes with a clear commit message describing what was done
-3. Push the branch and open the PR with a descriptive title and summary
+2. Stage and commit the relevant changes with clear, descriptive commit messages
+3. Run `npm run create-pr -- --title "…" --body "…"` with a thorough description (see below)
+
+**PR descriptions must be thorough.** Include:
+- A bullet-point summary of every feature, fix, or refactor
+- Why each change was made, not just what changed
+- Any architectural decisions or new patterns introduced
+- Known limitations or follow-up items if relevant
+
+```bash
+npm run create-pr -- \
+  --title "Short descriptive title" \
+  --body "$(cat <<'EOF'
+## Summary
+
+- Add X because Y; it lives in Z because it needs access to ...
+- Refactor A so that B; previously this caused ...
+- Fix bug where clicking outside the board did not deselect the character
+
+## Architecture notes
+
+- Skill effects are routed through SKILL_HIT so SelectionSystem stays decoupled from game logic
+
+## Follow-up
+- None
+EOF
+)"
+```

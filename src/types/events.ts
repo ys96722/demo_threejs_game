@@ -1,4 +1,5 @@
 import type { GridCoord } from './grid';
+import type { EffectPreview } from './characters';
 
 export const EVENTS = {
   TILE_HOVER_ENTER: 'TILE_HOVER_ENTER',
@@ -19,6 +20,8 @@ export const EVENTS = {
   SKILL_TARGETING_START:       'skill_targeting_start',
   SKILL_TARGETING_CANCELLED:   'skill_targeting_cancelled',
   SKILL_HIT:                   'skill_hit',
+  TARGET_PREVIEW_START:        'target_preview_start',
+  TARGET_PREVIEW_END:          'target_preview_end',
 } as const;
 
 export type EventPayloads = {
@@ -40,6 +43,8 @@ export type EventPayloads = {
   [EVENTS.SKILL_TARGETING_START]: { playerIndex: number; range: number };
   [EVENTS.SKILL_TARGETING_CANCELLED]: { playerIndex: number };
   [EVENTS.SKILL_HIT]: { casterIndex: number; skillName: string; targetCoord: GridCoord };
+  [EVENTS.TARGET_PREVIEW_START]: { targetPlayerIndex: number; preview: EffectPreview };
+  [EVENTS.TARGET_PREVIEW_END]: { targetPlayerIndex: number };
 };
 
 export type EventName = keyof EventPayloads;

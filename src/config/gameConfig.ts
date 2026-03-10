@@ -1,8 +1,12 @@
 import type { CharacterConfig } from '../types/characters';
 
 export const characters: CharacterConfig[] = [
-  { playerIndex: 1, name: 'Seonjae', startCoord: { col: 1, row: 1 }, moveRange: 6, spritePath: '/textures/seonjae_base.png', hp: 100, strength: 10, intellect: 8, defense: 1, resistance: 1, attackRange: 2, skills: [{ name: 'Reveille of Black Cranes', range: 3 }] },
-  { playerIndex: 2, name: 'Mina',    startCoord: { col: 6, row: 6 }, moveRange: 4, spritePath: '/textures/mina_base.png',    hp: 100, strength: 1,  intellect: 1, defense: 1, resistance: 1, attackRange: 1, skills: [{ name: 'Abrazo o Desprecio (Embrace or Exile)', range: 3 }] },
+  // Team 1
+  { playerIndex: 1, team: 1, name: 'Seonjae', startCoord: { col: 1, row: 1 }, moveRange: 6, spritePath: '/textures/seonjae_base.png', hp: 100, strength: 10, intellect: 8, defense: 1, resistance: 1, attackRange: 2, skills: [{ name: 'Reveille of Black Cranes', range: 3, targetType: 'ally' as const }] },
+  { playerIndex: 3, team: 1, name: 'Aerin',   startCoord: { col: 1, row: 3 }, moveRange: 5, spritePath: '/textures/aerin_base.png',   hp: 90,  strength: 7,  intellect: 3, defense: 3, resistance: 2, attackRange: 1, skills: [] },
+  // Team 2
+  { playerIndex: 2, team: 2, name: 'Mina',    startCoord: { col: 8, row: 6 }, moveRange: 4, spritePath: '/textures/mina_base.png',    hp: 100, strength: 1,  intellect: 1, defense: 1, resistance: 1, attackRange: 1, skills: [{ name: 'Abrazo o Desprecio (Embrace or Exile)', range: 3, targetType: 'any' as const }] },
+  { playerIndex: 4, team: 2, name: 'Isma',    startCoord: { col: 8, row: 8 }, moveRange: 3, spritePath: '/textures/isma_base.png',    hp: 130, strength: 4,  intellect: 5, defense: 5, resistance: 4, attackRange: 1, skills: [] },
 ];
 
 export const gameConfig = {
