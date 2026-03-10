@@ -12,6 +12,10 @@ export const characters: CharacterConfig[] = [
 export const gameConfig = {
   character: {
     spriteScale: 2.0,
+    glowScale: 1.25,
+    healthBarWidth: 1.2,
+    healthBarHeight: 0.15,
+    tokenRadius: 8,
   },
   grid: {
     cols: 10, // 8
@@ -26,6 +30,7 @@ export const gameConfig = {
     azimuth: 0, // 45
     near: 0.1,
     far: 100,
+    dist: 20,
   },
   movement: {
     animationDuration: 0.8, // 0.35
@@ -37,6 +42,9 @@ export const gameConfig = {
     bloomStrength:      0.15,
     bloomRadius:        0.2,
     bloomThreshold:     0.65,
+  },
+  audio: {
+    gain: 0.25,
   },
   scene: {
     background:         0x030712,

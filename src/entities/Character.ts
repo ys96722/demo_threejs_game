@@ -182,7 +182,7 @@ export class Character {
     this.selectionGlow = new THREE.Sprite(glowMat);
     this.selectionGlow.center.set(0.5, 0);
     this.selectionGlow.position.y = gameConfig.grid.tileHeight;
-    this.selectionGlow.scale.set(s * 1.25, s * 1.25, 1);
+    this.selectionGlow.scale.set(s * gameConfig.character.glowScale, s * gameConfig.character.glowScale, 1);
     this.selectionGlow.visible = false;
     this.group.add(this.selectionGlow);
 
@@ -200,8 +200,8 @@ export class Character {
     const hbMat = new THREE.SpriteMaterial({ map: this.healthBarTexture, depthTest: false });
     const hbSprite = new THREE.Sprite(hbMat);
     hbSprite.renderOrder = 1;
-    // Width = 1.2 world units, height = 0.15 world units (matches 128:16 canvas ratio ≈ 8:1)
-    hbSprite.scale.set(1.2, 0.15, 1);
+    // Width = healthBarWidth world units, height = healthBarHeight world units (matches 128:16 canvas ratio ≈ 8:1)
+    hbSprite.scale.set(gameConfig.character.healthBarWidth, gameConfig.character.healthBarHeight, 1);
     const hbPos = aboveHead(s + 0.2);
     hbSprite.position.set(0, hbPos.y, hbPos.z);
     this.group.add(hbSprite);
@@ -333,7 +333,7 @@ export class Character {
     ];
 
     for (const { x, color, spent } of dots) {
-      const r = 8;
+      const r = gameConfig.character.tokenRadius;
       ctx.beginPath();
       ctx.arc(x, height / 2, r, 0, Math.PI * 2);
       if (spent) {

@@ -4,6 +4,7 @@ import type { Character } from '../entities/Character';
 import type { EffectPreview, SkillDef } from '../types/characters';
 import type { GridCoord } from '../types/grid';
 import { computeAttackDamage } from '../logic/combat';
+import { gameConfig } from '../config/gameConfig';
 
 export class SelectionSystem {
   private selectedPlayerIndex: number | null = null;
@@ -282,7 +283,7 @@ export class SelectionSystem {
     osc.type = 'sine';
     osc.frequency.setValueAtTime(300, ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.12);
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.setValueAtTime(gameConfig.audio.gain, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.12);
