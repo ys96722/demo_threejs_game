@@ -12,7 +12,7 @@ npm run screenshot # Capture a single screenshot (low-level utility)
 npm run create-pr  # Capture before/after screenshots, commit, push, and open PR
 ```
 
-There are no tests. TypeScript type-checking (`tsc --noEmit`) is the primary correctness check, run implicitly by `npm run build`.
+TypeScript type-checking (`tsc --noEmit`) is the primary build correctness check, run implicitly by `npm run build`. Unit tests live in `src/logic/__tests__/` and run with `npm test` (Vitest, no browser needed).
 
 ## Architecture
 
@@ -89,3 +89,28 @@ npm run create-pr -- \
 EOF
 )"
 ```
+
+## Testing
+
+`npm test` runs Vitest in `node` environment — no browser, no Three.js, millisecond feedback.
+
+**Philosophy:** All game logic lives in `src/logic/` as pure functions. Every function takes plain objects (structural interfaces — no Three.js, no Character class) and returns a plain value. Tests pass anonymous plain objects; no imports from rendering, DOM, or bus.
+
+**`src/logic/` contract:**
+- Use structural interfaces (e.g., `HasStrengthDefense`, `HasCoordTeam`) so tests can pass plain objects.
+- No Three.js imports. No DOM. No `bus` imports.
+- `Game.ts` and `SelectionSystem.ts` are thin wrappers that delegate to these functions.
+
+**Full-coverage matrix rule:** Every mechanic must be tested against its full state space:
+- **Combat:** strength > defense (damage), defense >= strength (floor 0), 0-strength attacker, high defense, 1-hp lethal, buffs stacking
+- **Movement:** within range, at exact range, one beyond range, zero move tokens, own tile, occupied by enemy, occupied by ally, all four grid edges + off-grid
+- **Displacement (push/pull):** valid push, enemy at grid edge, destination occupied, valid pull, destination occupied, target at edge on pull
+- **Buffs:** correct stat modified, stacking
+
+**Adding a new mechanic:**
+1. Add the pure logic function to the appropriate file in `src/logic/`
+2. Add a `describe` block in `src/logic/__tests__/` covering the full matrix
+3. Wire the effect in `Game.ts` `SKILL_HIT` (or appropriate handler) delegating to the logic function
+4. Run `npm test` — all cases must pass before opening a PR
+
+**Future mechanics to anticipate:** debuffs (stat reduction), invincibility (block damage), range buffs (extend attackRange/moveRange), terrain effects, status effects (stun = 0 move tokens for N turns). Each needs a new function in `src/logic/` and a test matrix entry.

@@ -16,6 +16,7 @@ import { TurnManager } from './TurnManager';
 import { TileState } from '../types/grid';
 import type { GridCoord } from '../types/grid';
 import { gameConfig, characters as characterConfigs } from '../config/gameConfig';
+import { computeDisplaceDir } from '../logic/combat';
 
 const MAX_DT = 0.1;
 
@@ -114,7 +115,7 @@ export class Game {
                  c.coord.col === targetCoord.col && c.coord.row === targetCoord.row
           );
           if (!target) return false;
-          const { dc, dr } = this.computeDisplaceDir(caster, target);
+          const { dc, dr } = computeDisplaceDir(caster, target);
           const dest = { col: target.coord.col + dc, row: target.coord.row + dr };
           return this.grid.isValid(dest) && !this.isOccupied(dest);
         }
@@ -132,7 +133,7 @@ export class Game {
                  c.coord.col === targetCoord.col && c.coord.row === targetCoord.row
           );
           if (!target) return null;
-          return { type: 'displace', ...this.computeDisplaceDir(caster, target) };
+          return { type: 'displace', ...computeDisplaceDir(caster, target) };
         }
         return null;
       }
@@ -370,16 +371,8 @@ export class Game {
     return TileState.Default;
   }
 
-  private computeDisplaceDir(mover: Character, target: Character): { dc: number; dr: number } {
-    const isEnemy = target.team !== mover.team;
-    return {
-      dc: isEnemy ? Math.sign(target.coord.col - mover.coord.col) : Math.sign(mover.coord.col - target.coord.col),
-      dr: isEnemy ? Math.sign(target.coord.row - mover.coord.row) : Math.sign(mover.coord.row - target.coord.row),
-    };
-  }
-
   private applyDisplace(mover: Character, target: Character): void {
-    const { dc, dr } = this.computeDisplaceDir(mover, target);
+    const { dc, dr } = computeDisplaceDir(mover, target);
     const dest = { col: target.coord.col + dc, row: target.coord.row + dr };
     if (!this.grid.isValid(dest) || this.isOccupied(dest)) return;
     const from = target.coord;
