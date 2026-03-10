@@ -74,12 +74,13 @@ export class Game {
       char.onMoveComplete = (coord) => bus.emit(EVENTS.CHARACTER_MOVE_END, { coord });
     }
 
-    // Turn manager
-    this.turnManager = new TurnManager(characterConfigs.map(c => c.playerIndex));
+    // Turn manager cycles over unique teams, not individual character indices
+    const teams = [...new Set(characterConfigs.map(c => c.team))];
+    this.turnManager = new TurnManager(teams);
 
-    // Show tokens only for the first active player's characters
+    // Show tokens only for the first active team's characters
     for (const c of this.characters.values()) {
-      c.setTokensVisible(c.playerIndex === this.turnManager.activePlayer);
+      c.setTokensVisible(c.team === this.turnManager.activePlayer);
     }
 
     // Systems
@@ -89,12 +90,52 @@ export class Game {
       this.grid.tileMeshes
     );
     this.selectionSystem = new SelectionSystem(
-      () => this.turnManager.activePlayer,
       (idx) => this.characters.get(idx),
       (coord) => this.reachableCoords.has(`${coord.col},${coord.row}`),
-      (coord, attackerIdx) => [...this.characters.values()].find(
-        c => c.playerIndex !== attackerIdx && c.coord.col === coord.col && c.coord.row === coord.row
-      )
+      (coord, attackerIdx) => {
+        const attacker = this.characters.get(attackerIdx);
+        if (!attacker) return undefined;
+        return [...this.characters.values()].find(
+          c => c.team !== attacker.team && c.coord.col === coord.col && c.coord.row === coord.row
+        );
+      },
+      (coord) => {
+        const activeTeam = this.turnManager.activePlayer;
+        return [...this.characters.values()].find(
+          c => c.team === activeTeam && c.coord.col === coord.col && c.coord.row === coord.row
+        );
+      },
+      (casterIndex, skillName, targetCoord) => {
+        if (skillName === 'Abrazo o Desprecio (Embrace or Exile)') {
+          const caster = this.characters.get(casterIndex);
+          if (!caster) return false;
+          const target = [...this.characters.values()].find(
+            c => c.playerIndex !== casterIndex &&
+                 c.coord.col === targetCoord.col && c.coord.row === targetCoord.row
+          );
+          if (!target) return false;
+          const { dc, dr } = this.computeDisplaceDir(caster, target);
+          const dest = { col: target.coord.col + dc, row: target.coord.row + dr };
+          return this.grid.isValid(dest) && !this.isOccupied(dest);
+        }
+        return true;
+      },
+      (casterIndex, skillName, targetCoord) => {
+        if (skillName === 'Reveille of Black Cranes') {
+          return { type: 'buff', stat: 'Defense', amount: 10 };
+        }
+        if (skillName === 'Abrazo o Desprecio (Embrace or Exile)') {
+          const caster = this.characters.get(casterIndex);
+          if (!caster) return null;
+          const target = [...this.characters.values()].find(
+            c => c.playerIndex !== casterIndex &&
+                 c.coord.col === targetCoord.col && c.coord.row === targetCoord.row
+          );
+          if (!target) return null;
+          return { type: 'displace', ...this.computeDisplaceDir(caster, target) };
+        }
+        return null;
+      }
     );
     this.movementSystem = new MovementSystem(
       this.grid,
@@ -192,26 +233,35 @@ export class Game {
 
     bus.on(EVENTS.SKILL_HIT, ({ casterIndex, skillName, targetCoord }) => {
       const caster = this.characters.get(casterIndex);
+      if (!caster) return;
       const target = [...this.characters.values()].find(
-        c => c.playerIndex !== casterIndex && c.coord.col === targetCoord.col && c.coord.row === targetCoord.row
+        c => c.playerIndex !== casterIndex &&
+             c.coord.col === targetCoord.col && c.coord.row === targetCoord.row
       );
-      if (!caster || !target) return;
+      if (!target) return;
 
       if (skillName === 'Reveille of Black Cranes') {
-        target.setHp(target.hp - Math.max(0, caster.intellect - target.resistance));
+        target.defense += 10;
       } else if (skillName === 'Abrazo o Desprecio (Embrace or Exile)') {
-        this.applyPush(caster, target);
+        this.applyDisplace(caster, target);
       }
     });
 
+    bus.on(EVENTS.TARGET_PREVIEW_START, ({ targetPlayerIndex, preview }) => {
+      this.characters.get(targetPlayerIndex)?.showEffectPreview(preview);
+    });
+
+    bus.on(EVENTS.TARGET_PREVIEW_END, ({ targetPlayerIndex }) => {
+      this.characters.get(targetPlayerIndex)?.clearEffectPreview();
+    });
+
     bus.on(EVENTS.TURN_CHANGED, ({ player }) => {
-      const char = this.characters.get(player);
       this.turnCounter.textContent = `Current Turn: ${this.turnManager.turnCount}`;
-      this.turnIndicator.textContent = char ? `${char.name}'s Turn` : `Player ${player}'s Turn`;
+      this.turnIndicator.textContent = `Player ${player}'s Turn`;
       for (const c of this.characters.values()) {
         c.setSelected(false);
-        c.setTokensVisible(c.playerIndex === player);
-        if (c.playerIndex === player) c.resetTurn();
+        c.setTokensVisible(c.team === player);
+        if (c.team === player) c.resetTurn();
       }
     });
 
@@ -231,7 +281,6 @@ export class Game {
     this.composer.addPass(new OutputPass());
 
     // Turn counter + indicator DOM overlays
-    const firstChar = this.characters.get(characterConfigs[0].playerIndex);
     const sharedStyle = {
       position: 'fixed',
       left: '50%',
@@ -253,7 +302,7 @@ export class Game {
 
     this.turnIndicator = document.createElement('div');
     this.turnIndicator.id = 'turn-indicator';
-    this.turnIndicator.textContent = firstChar ? `${firstChar.name}'s Turn` : "Player 1's Turn";
+    this.turnIndicator.textContent = `Player ${this.turnManager.activePlayer}'s Turn`;
     Object.assign(this.turnIndicator.style, { ...sharedStyle, top: '52px', fontSize: '16px' });
     document.body.appendChild(this.turnIndicator);
   }
@@ -321,9 +370,16 @@ export class Game {
     return TileState.Default;
   }
 
-  private applyPush(pusher: Character, target: Character): void {
-    const dc = Math.sign(target.coord.col - pusher.coord.col);
-    const dr = Math.sign(target.coord.row - pusher.coord.row);
+  private computeDisplaceDir(mover: Character, target: Character): { dc: number; dr: number } {
+    const isEnemy = target.team !== mover.team;
+    return {
+      dc: isEnemy ? Math.sign(target.coord.col - mover.coord.col) : Math.sign(mover.coord.col - target.coord.col),
+      dr: isEnemy ? Math.sign(target.coord.row - mover.coord.row) : Math.sign(mover.coord.row - target.coord.row),
+    };
+  }
+
+  private applyDisplace(mover: Character, target: Character): void {
+    const { dc, dr } = this.computeDisplaceDir(mover, target);
     const dest = { col: target.coord.col + dc, row: target.coord.row + dr };
     if (!this.grid.isValid(dest) || this.isOccupied(dest)) return;
     const from = target.coord;
@@ -334,7 +390,7 @@ export class Game {
   private checkTurnEnd(): void {
     const active = this.turnManager.activePlayer;
     const allSpent = [...this.characters.values()]
-      .filter(c => c.playerIndex === active)
+      .filter(c => c.team === active)
       .every(c => c.actionTokens === 0);
     if (allSpent) this.turnManager.nextTurn();
   }

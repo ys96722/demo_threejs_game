@@ -1,8 +1,12 @@
 import { bus } from '../core/EventBus';
 import { EVENTS } from '../types/events';
 import type { Character } from '../entities/Character';
-import type { SkillDef } from '../types/characters';
+import type { EffectPreview, SkillDef } from '../types/characters';
 import type { GridCoord } from '../types/grid';
+
+function computeAttackDamage(attacker: Character, target: Character): number {
+  return Math.max(0, attacker.strength - target.defense);
+}
 
 export class SelectionSystem {
   private selectedPlayerIndex: number | null = null;
@@ -11,14 +15,19 @@ export class SelectionSystem {
   private activeSkill: SkillDef | null = null;
   private audioCtx: AudioContext | null = null;
   private actionPanel: HTMLDivElement;
+  private previewTargetIndex: number | null = null;
 
   constructor(
-    private getActivePlayer: () => number,
     private getCharacter: (idx: number) => Character | undefined,
     private isReachable: (coord: GridCoord) => boolean,
-    private getEnemyAtCoord: (coord: GridCoord, attackerPlayerIndex: number) => Character | undefined
+    private getEnemyAtCoord: (coord: GridCoord, attackerPlayerIndex: number) => Character | undefined,
+    private getOwnCharacterAtCoord: (coord: GridCoord) => Character | undefined,
+    private canTargetWithSkill?: (casterIndex: number, skillName: string, targetCoord: GridCoord) => boolean,
+    private getSkillPreview?: (casterIndex: number, skillName: string, targetCoord: GridCoord) => EffectPreview | null,
   ) {
     bus.on(EVENTS.TILE_CLICKED, this.handleTileClicked);
+    bus.on(EVENTS.TILE_HOVER_ENTER, this.handleTileHoverEnter);
+    bus.on(EVENTS.TILE_HOVER_EXIT, this.handleTileHoverExit);
     bus.on(EVENTS.CHARACTER_SELECTED, this.handleCharacterSelected);
     bus.on(EVENTS.CHARACTER_DESELECTED, this.handleCharacterDeselected);
     bus.on(EVENTS.TURN_CHANGED, this.handleTurnChanged);
@@ -157,20 +166,19 @@ export class SelectionSystem {
       return;
     }
 
-    const activePlayer = this.getActivePlayer();
-    const activeChar = this.getCharacter(activePlayer);
-    if (!activeChar) return;
-
-    const isActiveCharTile =
-      coord.col === activeChar.coord.col && coord.row === activeChar.coord.row;
-
-    if (isActiveCharTile) {
-      if (this.selectedPlayerIndex !== null) {
+    const ownChar = this.getOwnCharacterAtCoord(coord);
+    if (ownChar !== undefined) {
+      if (this.selectedPlayerIndex === ownChar.playerIndex) {
+        // Clicking the already-selected character → deselect
         bus.emit(EVENTS.CHARACTER_DESELECTED, { playerIndex: this.selectedPlayerIndex });
         this.selectedPlayerIndex = null;
       } else {
-        this.selectedPlayerIndex = activePlayer;
-        bus.emit(EVENTS.CHARACTER_SELECTED, { playerIndex: activePlayer, coord });
+        // Clicking a different own character → switch selection
+        if (this.selectedPlayerIndex !== null) {
+          bus.emit(EVENTS.CHARACTER_DESELECTED, { playerIndex: this.selectedPlayerIndex });
+        }
+        this.selectedPlayerIndex = ownChar.playerIndex;
+        bus.emit(EVENTS.CHARACTER_SELECTED, { playerIndex: ownChar.playerIndex, coord });
       }
       return;
     }
@@ -181,6 +189,60 @@ export class SelectionSystem {
       if (char && char.moveTokens > 0) this.playInvalidSound();
     }
   };
+
+  private handleTileHoverEnter = ({ coord }: { coord: GridCoord }): void => {
+    // Always clear any existing preview before computing a new one
+    this.clearPreview();
+
+    if (!this.isTargetingAttack && !this.isTargetingSkill) return;
+    if (this.selectedPlayerIndex === null) return;
+    const caster = this.getCharacter(this.selectedPlayerIndex);
+    if (!caster) return;
+
+    // Caster's own tile has no preview
+    if (coord.col === caster.coord.col && coord.row === caster.coord.row) return;
+
+    const dist = Math.abs(coord.col - caster.coord.col) + Math.abs(coord.row - caster.coord.row);
+
+    if (this.isTargetingAttack) {
+      const enemy = this.getEnemyAtCoord(coord, caster.playerIndex);
+      if (!enemy || dist > caster.attackRange) return;
+      const damage = computeAttackDamage(caster, enemy);
+      this.previewTargetIndex = enemy.playerIndex;
+      bus.emit(EVENTS.TARGET_PREVIEW_START, { targetPlayerIndex: enemy.playerIndex, preview: { type: 'damage', amount: damage } });
+      return;
+    }
+
+    if (this.isTargetingSkill && this.activeSkill) {
+      const skill = this.activeSkill;
+      let target: Character | undefined;
+      if (skill.targetType === 'enemy') {
+        target = this.getEnemyAtCoord(coord, caster.playerIndex);
+      } else if (skill.targetType === 'ally') {
+        target = this.getOwnCharacterAtCoord(coord);
+      } else {
+        target = this.getEnemyAtCoord(coord, caster.playerIndex) ?? this.getOwnCharacterAtCoord(coord);
+      }
+      if (!target || dist > skill.range) return;
+      const extraValid = !this.canTargetWithSkill || this.canTargetWithSkill(this.selectedPlayerIndex, skill.name, coord);
+      if (!extraValid) return;
+      const preview = this.getSkillPreview?.(this.selectedPlayerIndex, skill.name, coord);
+      if (!preview) return;
+      this.previewTargetIndex = target.playerIndex;
+      bus.emit(EVENTS.TARGET_PREVIEW_START, { targetPlayerIndex: target.playerIndex, preview });
+    }
+  };
+
+  private handleTileHoverExit = (_: { coord: GridCoord }): void => {
+    this.clearPreview();
+  };
+
+  private clearPreview(): void {
+    if (this.previewTargetIndex !== null) {
+      bus.emit(EVENTS.TARGET_PREVIEW_END, { targetPlayerIndex: this.previewTargetIndex });
+      this.previewTargetIndex = null;
+    }
+  }
 
   private handleCanvasClickedEmpty = (): void => {
     if (this.selectedPlayerIndex === null) return;
@@ -249,7 +311,7 @@ export class SelectionSystem {
     const enemy = this.getEnemyAtCoord(coord, attacker.playerIndex);
 
     if (enemy && dist <= attacker.attackRange) {
-      const damage = Math.max(0, attacker.strength - enemy.defense);
+      const damage = computeAttackDamage(attacker, enemy);
       enemy.setHp(enemy.hp - damage);
       attacker.actionTokens -= 1;
       attacker.moveTokens = 0;
@@ -279,10 +341,24 @@ export class SelectionSystem {
     }
 
     const dist = Math.abs(coord.col - caster.coord.col) + Math.abs(coord.row - caster.coord.row);
-    const enemy = this.getEnemyAtCoord(coord, caster.playerIndex);
+    const skill = this.activeSkill;
 
-    if (enemy && dist <= this.activeSkill.range) {
-      bus.emit(EVENTS.SKILL_HIT, { casterIndex: this.selectedPlayerIndex, skillName: this.activeSkill.name, targetCoord: coord });
+    // Resolve target based on skill's targetType
+    let target: Character | undefined;
+    if (skill.targetType === 'enemy') {
+      target = this.getEnemyAtCoord(coord, caster.playerIndex);
+    } else if (skill.targetType === 'ally') {
+      target = this.getOwnCharacterAtCoord(coord);
+    } else {
+      // 'any': enemy takes priority, then own ally
+      target = this.getEnemyAtCoord(coord, caster.playerIndex) ?? this.getOwnCharacterAtCoord(coord);
+    }
+
+    const extraValid = !this.canTargetWithSkill ||
+      this.canTargetWithSkill(this.selectedPlayerIndex, skill.name, coord);
+
+    if (target && dist <= skill.range && extraValid) {
+      bus.emit(EVENTS.SKILL_HIT, { casterIndex: this.selectedPlayerIndex, skillName: skill.name, targetCoord: coord });
       caster.actionTokens -= 1;
       caster.moveTokens = 0;
       caster.updateTokenDisplay();
@@ -300,10 +376,12 @@ export class SelectionSystem {
   private handleKeyDown = (e: KeyboardEvent): void => {
     if (e.key !== 'Escape' || this.selectedPlayerIndex === null) return;
     if (this.isTargetingAttack) {
+      this.clearPreview();
       this.isTargetingAttack = false;
       bus.emit(EVENTS.ATTACK_TARGETING_CANCELLED, { playerIndex: this.selectedPlayerIndex });
       this.showPanel(this.selectedPlayerIndex);
     } else if (this.isTargetingSkill) {
+      this.clearPreview();
       this.isTargetingSkill = false;
       this.activeSkill = null;
       bus.emit(EVENTS.SKILL_TARGETING_CANCELLED, { playerIndex: this.selectedPlayerIndex });
@@ -320,6 +398,7 @@ export class SelectionSystem {
   };
 
   private handleCharacterDeselected = (): void => {
+    this.clearPreview();
     this.isTargetingAttack = false;
     this.isTargetingSkill = false;
     this.activeSkill = null;
@@ -327,6 +406,7 @@ export class SelectionSystem {
   };
 
   private handleTurnChanged = (): void => {
+    this.clearPreview();
     this.isTargetingAttack = false;
     this.isTargetingSkill = false;
     this.activeSkill = null;
@@ -372,6 +452,8 @@ export class SelectionSystem {
 
   dispose(): void {
     bus.off(EVENTS.TILE_CLICKED, this.handleTileClicked);
+    bus.off(EVENTS.TILE_HOVER_ENTER, this.handleTileHoverEnter);
+    bus.off(EVENTS.TILE_HOVER_EXIT, this.handleTileHoverExit);
     bus.off(EVENTS.CHARACTER_SELECTED, this.handleCharacterSelected);
     bus.off(EVENTS.CHARACTER_DESELECTED, this.handleCharacterDeselected);
     bus.off(EVENTS.TURN_CHANGED, this.handleTurnChanged);

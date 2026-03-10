@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Tile } from '../world/Tile';
 import { CharacterAnimator } from './CharacterAnimator';
 import type { GridCoord } from '../types/grid';
-import type { CharacterConfig, SkillDef } from '../types/characters';
+import type { CharacterConfig, EffectPreview, SkillDef } from '../types/characters';
 import { gameConfig } from '../config/gameConfig';
 
 const loader = new THREE.TextureLoader();
@@ -83,6 +83,7 @@ function loadTransparentTexture(url: string): THREE.Texture {
 
 export class Character {
   readonly playerIndex: number;
+  readonly team: number;
   readonly name: string;
   readonly moveRange: number;
   readonly group: THREE.Group; // root transform; moved by the animator and idle bob
@@ -97,7 +98,7 @@ export class Character {
   readonly maxHp: number;
   readonly strength: number;
   readonly intellect: number;
-  readonly defense: number;
+  defense: number;
   readonly resistance: number;
   readonly attackRange: number;
   readonly skills: SkillDef[];
@@ -116,12 +117,18 @@ export class Character {
   private tokenCanvas: HTMLCanvasElement;
   private tokenTexture: THREE.CanvasTexture;
 
+  // Effect preview overlay (damage number, buff label, displacement arrow)
+  private previewCanvas: HTMLCanvasElement;
+  private previewTexture: THREE.CanvasTexture;
+  private previewSprite: THREE.Sprite;
+
   // Accumulates elapsed time while the character is idle so the bob animation
   // progresses continuously between moves.
   private idleTime = 0;
 
   constructor(config: CharacterConfig) {
     this.playerIndex = config.playerIndex;
+    this.team = config.team;
     this.name = config.name;
     this.moveRange = config.moveRange;
     this.coord = config.startCoord;
@@ -202,6 +209,20 @@ export class Character {
     this.group.add(this.tokenSprite);
     this.updateTokenDisplay();
 
+    // Effect preview — canvas sprite above the token indicator.
+    // Shows damage numbers, buff labels, or displacement arrows during targeting hover.
+    this.previewCanvas = document.createElement('canvas');
+    this.previewCanvas.width = 128;
+    this.previewCanvas.height = 28;
+    this.previewTexture = new THREE.CanvasTexture(this.previewCanvas);
+    const previewMat = new THREE.SpriteMaterial({ map: this.previewTexture, depthTest: false });
+    this.previewSprite = new THREE.Sprite(previewMat);
+    this.previewSprite.renderOrder = 3;
+    this.previewSprite.scale.set(1.2, 0.26, 1);
+    this.previewSprite.position.y = gameConfig.grid.tileHeight + s + 0.74;
+    this.previewSprite.visible = false;
+    this.group.add(this.previewSprite);
+
     const worldPos = Tile.gridToWorld(config.startCoord);
     this.group.position.set(worldPos.x, 0, worldPos.z);
 
@@ -210,18 +231,21 @@ export class Character {
     };
   }
 
-  private drawHealthBar(): void {
+  // When previewHp and previewColor are provided the bar shows the preview state
+  // (orange for damage, dark-green for healing) without touching this.hp.
+  private drawHealthBar(previewHp?: number, previewColor?: string): void {
     const ctx = this.healthBarCanvas.getContext('2d')!;
     const { width, height } = this.healthBarCanvas;
-    const fraction = Math.max(0, this.hp / this.maxHp);
+    const hp = previewHp ?? this.hp;
+    const fraction = Math.max(0, hp / this.maxHp);
 
-    // Background
     ctx.fillStyle = '#1a0000';
     ctx.fillRect(0, 0, width, height);
 
-    // Foreground — green above 50%, yellow above 25%, red below
-    ctx.fillStyle = fraction > 0.5 ? '#22c55e' : fraction > 0.25 ? '#eab308' : '#ef4444';
-    ctx.fillRect(0, 0, Math.floor(width * fraction), height);
+    if (Math.floor(width * fraction) > 0) {
+      ctx.fillStyle = previewColor ?? (fraction > 0.5 ? '#22c55e' : fraction > 0.25 ? '#eab308' : '#ef4444');
+      ctx.fillRect(0, 0, Math.floor(width * fraction), height);
+    }
 
     this.healthBarTexture.needsUpdate = true;
   }
@@ -229,6 +253,50 @@ export class Character {
   setHp(value: number): void {
     this.hp = Math.max(0, Math.min(this.maxHp, value));
     this.drawHealthBar();
+  }
+
+  showEffectPreview(preview: EffectPreview): void {
+    const ctx = this.previewCanvas.getContext('2d')!;
+    const { width, height } = this.previewCanvas;
+    ctx.clearRect(0, 0, width, height);
+
+    const drawText = (text: string, color: string, fontSize: number): void => {
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // Outline for legibility over any background
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+      ctx.lineWidth = 3;
+      ctx.strokeText(text, width / 2, height / 2);
+      ctx.fillStyle = color;
+      ctx.fillText(text, width / 2, height / 2);
+    };
+
+    if (preview.type === 'damage') {
+      this.drawHealthBar(Math.max(0, this.hp - preview.amount), '#f97316');
+      drawText(`-${preview.amount}`, '#f97316', 16);
+    } else if (preview.type === 'heal') {
+      this.drawHealthBar(Math.min(this.maxHp, this.hp + preview.amount), '#166534');
+      drawText(`+${preview.amount}`, '#4ade80', 16);
+    } else if (preview.type === 'buff') {
+      drawText(`+${preview.amount} ${preview.stat}`, '#60a5fa', 13);
+    } else if (preview.type === 'displace') {
+      const arrows: Record<string, string> = {
+        '1,0': '→', '-1,0': '←',
+        '0,-1': '↑', '0,1': '↓',
+        '1,-1': '↗', '-1,-1': '↖',
+        '1,1': '↘', '-1,1': '↙',
+      };
+      drawText(arrows[`${preview.dc},${preview.dr}`] ?? '?', '#ffffff', 20);
+    }
+
+    this.previewTexture.needsUpdate = true;
+    this.previewSprite.visible = true;
+  }
+
+  clearEffectPreview(): void {
+    this.drawHealthBar(); // restore actual HP bar with normal colors
+    this.previewSprite.visible = false;
   }
 
   setSelected(selected: boolean): void {

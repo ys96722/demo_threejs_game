@@ -41,6 +41,20 @@ Key `Character` methods: `setSelected(bool)` — shows/hides the bloom glow. `se
 
 **Post-processing:** `Game` uses Three.js `EffectComposer` (RenderPass → UnrealBloomPass → OutputPass). Call `composer.render()` instead of `renderer.render()` in the loop. The bloom threshold is 0.65 — use HDR color values (> 1.0 per channel) on `MeshBasicMaterial` or `SpriteMaterial` to guarantee bloom on emissive objects.
 
+## Multiplayer Target Architecture
+
+The long-term target is a two-player game where each player runs a **separate browser client** connected to a **shared authoritative server**. Keep the following in mind when making architectural decisions:
+
+- **Events as the network primitive.** The event bus already decouples actions from side effects. In multiplayer, player-action events (`TILE_CLICKED`, `CHARACTER_SELECTED`, etc.) will be forwarded over the network and applied on all clients. Design event payloads to be serializable (plain JSON — no class instances, no Three.js objects).
+
+- **Team = player session.** `character.team` maps directly to a connected player. `SelectionSystem.getOwnCharacterAtCoord` already encapsulates "only the local player can act on their own team's characters" — in multiplayer this becomes an authorization check: only emit actions for `localPlayerTeam`.
+
+- **Keep game logic in `Game.ts` event handlers.** Skill effects, movement validation, and turn management all live in `Game.ts` and are driven purely by events. This keeps them portable to a server-side authoritative model without restructuring.
+
+- **Avoid direct mutation outside events.** Never mutate character state or tile state outside of a bus event handler — this ensures all state changes can be replayed from an event log.
+
+- **Local player concept.** When multiplayer is implemented, `Game` (or a future `GameClient`) will receive a `localTeam: number` at construction to gate which inputs are forwarded to the server.
+
 ## Pull Requests
 
 Every PR must include before and after screenshots of the game screen. Run `npm run create-pr` to capture before/after screenshots, commit them, push the branch, and open the PR in one step. Pass `--title "…"` to set the PR title non-interactively.
