@@ -138,17 +138,14 @@ export class SelectionSystem {
     bus.emit(EVENTS.SKILL_TARGETING_START, { playerIndex: this.selectedPlayerIndex, range: skill.range });
   }
 
-  // Other actions consume the token immediately and deselect.
+  // Other actions spend the action token via intent — Game.ts applies the effect.
   private handleActionClick(): void {
     if (this.selectedPlayerIndex === null) return;
     const char = this.getCharacter(this.selectedPlayerIndex);
     if (!char || char.actionTokens === 0) return;
-    char.actionTokens -= 1;
-    char.moveTokens = 0;
-    char.updateTokenDisplay();
     const playerIndex = this.selectedPlayerIndex;
     this.selectedPlayerIndex = null;
-    bus.emit(EVENTS.ACTION_USED, { playerIndex });
+    bus.emit(EVENTS.SPEND_ACTION_INTENT, { playerIndex });
     bus.emit(EVENTS.CHARACTER_DESELECTED, { playerIndex });
   }
 
@@ -308,15 +305,11 @@ export class SelectionSystem {
     const enemy = this.getEnemyAtCoord(coord, attacker.playerIndex);
 
     if (enemy && dist <= attacker.attackRange) {
-      const damage = computeAttackDamage(attacker, enemy);
-      enemy.setHp(enemy.hp - damage);
-      attacker.actionTokens -= 1;
-      attacker.moveTokens = 0;
-      attacker.updateTokenDisplay();
       const playerIndex = this.selectedPlayerIndex;
       this.isTargetingAttack = false;
       this.selectedPlayerIndex = null;
-      bus.emit(EVENTS.ACTION_USED, { playerIndex });
+      // Emit intent — Game.ts applies damage (solo) or forwards to server (PvP)
+      bus.emit(EVENTS.ATTACK_INTENT, { attackerIndex: attacker.playerIndex, targetCoord: coord });
       bus.emit(EVENTS.CHARACTER_DESELECTED, { playerIndex });
     } else {
       this.playInvalidSound();
@@ -355,15 +348,11 @@ export class SelectionSystem {
       this.canTargetWithSkill(this.selectedPlayerIndex, skill.name, coord);
 
     if (target && dist <= skill.range && extraValid) {
-      bus.emit(EVENTS.SKILL_HIT, { casterIndex: this.selectedPlayerIndex, skillName: skill.name, targetCoord: coord });
-      caster.actionTokens -= 1;
-      caster.moveTokens = 0;
-      caster.updateTokenDisplay();
       const playerIndex = this.selectedPlayerIndex;
       this.isTargetingSkill = false;
       this.activeSkill = null;
       this.selectedPlayerIndex = null;
-      bus.emit(EVENTS.ACTION_USED, { playerIndex });
+      bus.emit(EVENTS.SKILL_HIT, { casterIndex: playerIndex, skillName: skill.name, targetCoord: coord });
       bus.emit(EVENTS.CHARACTER_DESELECTED, { playerIndex });
     } else {
       this.playInvalidSound();
@@ -371,6 +360,7 @@ export class SelectionSystem {
   }
 
   private handleKeyDown = (e: KeyboardEvent): void => {
+    if (document.activeElement?.tagName === 'INPUT') return;
     if (e.key !== 'Escape' || this.selectedPlayerIndex === null) return;
     if (this.isTargetingAttack) {
       this.clearPreview();
@@ -399,6 +389,7 @@ export class SelectionSystem {
     this.isTargetingAttack = false;
     this.isTargetingSkill = false;
     this.activeSkill = null;
+    this.selectedPlayerIndex = null;
     this.hidePanel();
   };
 
