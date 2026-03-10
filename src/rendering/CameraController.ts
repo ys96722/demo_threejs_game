@@ -6,6 +6,10 @@ import { gameConfig } from '../config/gameConfig';
 export class CameraController {
   readonly camera: THREE.OrthographicCamera;
 
+  private readonly _onResize = ({ width, height }: { width: number; height: number }): void => {
+    this.updateFrustum(width / height);
+  };
+
   constructor() {
     const { frustumSize, elevation, azimuth, near, far } = gameConfig.camera;
     const aspect = window.innerWidth / window.innerHeight;
@@ -21,15 +25,17 @@ export class CameraController {
 
     this.positionCamera(elevation, azimuth);
 
-    bus.on(EVENTS.RENDERER_RESIZED, ({ width, height }) => {
-      this.updateFrustum(width / height);
-    });
+    bus.on(EVENTS.RENDERER_RESIZED, this._onResize);
+  }
+
+  dispose(): void {
+    bus.off(EVENTS.RENDERER_RESIZED, this._onResize);
   }
 
   private positionCamera(elevationDeg: number, azimuthDeg: number): void {
     const elRad = THREE.MathUtils.degToRad(elevationDeg);
     const azRad = THREE.MathUtils.degToRad(azimuthDeg);
-    const dist = 20;
+    const dist = gameConfig.camera.dist;
 
     this.camera.position.set(
       dist * Math.cos(elRad) * Math.sin(azRad),

@@ -32,7 +32,10 @@ class LobbyConnections:
         """Send the same message to all connected clients."""
         payload = json.dumps(msg)
         tasks = [ws.send_text(payload) for ws in self.connections.values()]
-        await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for r in results:
+            if isinstance(r, Exception):
+                print(f"[broadcast] send failed: {r}")
 
     async def send_to_others(self, sender_team: int, msg: dict) -> None:
         payload = json.dumps(msg)

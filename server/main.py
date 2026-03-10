@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -47,6 +49,9 @@ async def join_lobby(body: JoinRequest) -> dict:
 
 @app.websocket("/ws/{code}")
 async def websocket_endpoint(ws: WebSocket, code: str, team: int) -> None:
+    if team not in (1, 2):
+        await ws.close(code=4003, reason="Invalid team")
+        return
     code = code.upper()
     lobby = lobby_manager.get(code)
     if not lobby:
@@ -69,8 +74,10 @@ async def websocket_endpoint(ws: WebSocket, code: str, team: int) -> None:
         # Game loop: receive action messages from this client
         while True:
             raw = await ws.receive_text()
-            import json
-            msg = json.loads(raw)
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
             await handle_action(code, team, msg)
 
     except WebSocketDisconnect:
