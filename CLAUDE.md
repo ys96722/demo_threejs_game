@@ -69,7 +69,51 @@ Every PR must include before and after screenshots of the game screen. Run `npm 
 
 **When asked to create a PR and the current branch is `main`:**
 1. Create a new branch with a short descriptive name (e.g. `feature/skill-system`, `fix/attack-range-preview`)
-2. Stage and commit the relevant changes with clear, descriptive commit messages
+2. Stage and commit the relevant changes in **separate, focused commits** — one commit per coherent concern. Use explicit `git add <file1> <file2> …` per commit group; never `git add -A` or `git add .`. Do not commit `.env` or secret files.
+
+   **Grouping heuristic:**
+
+   | Commit | What goes in it |
+   |--------|----------------|
+   | Types / events | `src/types/`, `src/core/GameMode.ts` |
+   | Server | `server/` |
+   | Networking (client) | `src/net/` |
+   | Systems / game logic | `src/systems/`, `src/core/Game.ts`, `src/core/TurnManager.ts` |
+   | UI / entry point | `src/lobby/`, `src/main.ts` |
+   | Config / build | `package.json`, `vite.config.ts`, `tsconfig.json` |
+   | Docs | `CLAUDE.md`, `CODEBASE.md`, `*.md` |
+
+   **Example multi-commit sequence:**
+   ```bash
+   # Commit 1 — shared types / events
+   git add src/types/events.ts src/core/GameMode.ts
+   git commit -m "Add network event types and GameMode union"
+
+   # Commit 2 — server
+   git add server/
+   git commit -m "Add FastAPI WebSocket server with lobby and game state"
+
+   # Commit 3 — client networking
+   git add src/net/GameClient.ts src/net/protocol.ts
+   git commit -m "Add GameClient and WebSocket protocol helpers"
+
+   # Commit 4 — systems refactor
+   git add src/systems/MovementSystem.ts src/systems/SelectionSystem.ts src/core/Game.ts src/core/TurnManager.ts
+   git commit -m "Refactor systems to emit intent events only; Game.ts handles all state"
+
+   # Commit 5 — UI / entry point
+   git add src/lobby/LobbyScreen.ts src/main.ts
+   git commit -m "Add LobbyScreen and update entry point to support PvP flow"
+
+   # Commit 6 — config / build
+   git add package.json vite.config.ts
+   git commit -m "Add server script and Vite proxy for /lobby and /ws"
+
+   # Commit 7 — docs
+   git add CLAUDE.md CODEBASE.md MULTIPLAYER.md
+   git commit -m "Update docs: add MULTIPLAYER.md, refresh CLAUDE.md + CODEBASE.md"
+   ```
+
 3. Run `npm run create-pr -- --title "…" --body "…"` with a thorough description (see below)
 
 **PR descriptions must be thorough.** Include:
