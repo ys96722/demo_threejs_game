@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Tile } from './Tile';
 import { gameConfig } from '../config/gameConfig';
 import type { GridCoord } from '../types/grid';
+import { isValidCoord } from '../logic/grid';
 
 export class Grid {
   readonly scene: THREE.Scene;
@@ -29,7 +30,7 @@ export class Grid {
 
   isValid(coord: GridCoord): boolean {
     const { cols, rows } = gameConfig.grid;
-    return coord.col >= 0 && coord.col < cols && coord.row >= 0 && coord.row < rows;
+    return isValidCoord(coord, cols, rows);
   }
 
   allTiles(): Tile[] {

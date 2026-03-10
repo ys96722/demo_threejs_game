@@ -3,10 +3,7 @@ import { EVENTS } from '../types/events';
 import type { Character } from '../entities/Character';
 import type { EffectPreview, SkillDef } from '../types/characters';
 import type { GridCoord } from '../types/grid';
-
-function computeAttackDamage(attacker: Character, target: Character): number {
-  return Math.max(0, attacker.strength - target.defense);
-}
+import { computeAttackDamage } from '../logic/combat';
 
 export class SelectionSystem {
   private selectedPlayerIndex: number | null = null;
