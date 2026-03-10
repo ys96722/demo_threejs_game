@@ -158,6 +158,17 @@ export class Character {
 
     const s = gameConfig.character.spriteScale;
 
+    // Compute local-group position that sits d world-units above the sprite base in screen space.
+    // At elevation E the camera's up vector in world space is (0, cos E, -sin E), so advancing
+    // the billboard d units "up on screen" requires offsetting both Y and Z in local space.
+    const elevRad = THREE.MathUtils.degToRad(gameConfig.camera.elevation);
+    const cosEl = Math.cos(elevRad);
+    const sinEl = Math.sin(elevRad);
+    const aboveHead = (d: number) => ({
+      y: gameConfig.grid.tileHeight + d * cosEl,
+      z: -d * sinEl,
+    });
+
     // Selection glow — same texture, slightly larger, additive blending with HDR warm color.
     // Rendered before the main sprite (renderOrder 0) so the main sprite draws cleanly on top.
     // HDR color values (> 1) exceed the bloom threshold and trigger UnrealBloomPass.
@@ -191,7 +202,8 @@ export class Character {
     hbSprite.renderOrder = 1;
     // Width = 1.2 world units, height = 0.15 world units (matches 128:16 canvas ratio ≈ 8:1)
     hbSprite.scale.set(1.2, 0.15, 1);
-    hbSprite.position.y = gameConfig.grid.tileHeight + s + 0.2;
+    const hbPos = aboveHead(s + 0.2);
+    hbSprite.position.set(0, hbPos.y, hbPos.z);
     this.group.add(hbSprite);
     this.drawHealthBar();
 
@@ -204,7 +216,8 @@ export class Character {
     this.tokenSprite = new THREE.Sprite(tokenMat);
     this.tokenSprite.renderOrder = 2;
     this.tokenSprite.scale.set(0.6, 0.24, 1);
-    this.tokenSprite.position.y = gameConfig.grid.tileHeight + s + 0.42;
+    const tokenPos = aboveHead(s + 0.42);
+    this.tokenSprite.position.set(0, tokenPos.y, tokenPos.z);
     this.tokenSprite.visible = false; // hidden until this player's turn
     this.group.add(this.tokenSprite);
     this.updateTokenDisplay();
@@ -219,7 +232,8 @@ export class Character {
     this.previewSprite = new THREE.Sprite(previewMat);
     this.previewSprite.renderOrder = 3;
     this.previewSprite.scale.set(1.2, 0.26, 1);
-    this.previewSprite.position.y = gameConfig.grid.tileHeight + s + 0.74;
+    const previewPos = aboveHead(s + 0.74);
+    this.previewSprite.position.set(0, previewPos.y, previewPos.z);
     this.previewSprite.visible = false;
     this.group.add(this.previewSprite);
 
