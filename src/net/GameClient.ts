@@ -23,7 +23,12 @@ export class GameClient {
   }
 
   private handleMessage(ev: MessageEvent): void {
-    const msg = JSON.parse(String(ev.data)) as ServerMessage;
+    let msg: ServerMessage;
+    try {
+      msg = JSON.parse(String(ev.data)) as ServerMessage;
+    } catch {
+      return;
+    }
     switch (msg.type) {
       case 'STATE_UPDATE':
         this.applyStateUpdate(msg.payload);
