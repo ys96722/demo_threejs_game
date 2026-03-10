@@ -59,6 +59,10 @@ The long-term target is a two-player game where each player runs a **separate br
 
 Every PR must include before and after screenshots of the game screen. Run `npm run create-pr` to capture before/after screenshots, commit them, push the branch, and open the PR in one step. Pass `--title "…"` to set the PR title non-interactively.
 
+**Keep docs current.** Both `CLAUDE.md` and `CODEBASE.md` must be updated in the same PR as any change that affects them:
+- `CLAUDE.md` — update when architecture, commands, patterns, or conventions change
+- `CODEBASE.md` — update when files are added/removed, system responsibilities change, event flow changes, character stats change, or new layers are introduced
+
 **When asked to create a PR and the current branch is `main`:**
 1. Create a new branch with a short descriptive name (e.g. `feature/skill-system`, `fix/attack-range-preview`)
 2. Stage and commit the relevant changes with clear, descriptive commit messages
