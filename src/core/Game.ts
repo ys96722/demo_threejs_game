@@ -332,6 +332,7 @@ export class Game {
       const char = this.characters.get(characterIndex);
       if (!char) return;
       char.moveTokens -= 1;
+      char.updateTokenDisplay();
       char.moveTo(to);
       bus.emit(EVENTS.CHARACTER_MOVE_START, { from, to });
     });

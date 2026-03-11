@@ -11,7 +11,7 @@ export const characters: CharacterConfig[] = [
 
 export const gameConfig = {
   character: {
-    spriteScale: 2.0,
+    spriteScale: 2.5,
     glowScale: 1.25,
     healthBarWidth: 1.2,
     healthBarHeight: 0.15,
