@@ -1,13 +1,20 @@
 import type { GameMode } from '../core/GameMode';
 import type { ServerMessage } from '../net/protocol';
 import { API_BASE, WS_BASE } from '../config/env';
+import { LobbyMusic } from '../audio/LobbyMusic';
+import { SelectionScreen } from './SelectionScreen';
+import { characters as allCharacters, teamSpawnCoords } from '../config/gameConfig';
+import type { CharacterConfig } from '../types/characters';
 
-type LobbyPhase = 'MENU' | 'PVP_MENU' | 'JOIN_INPUT' | 'WAITING';
+type LobbyPhase = 'MENU' | 'PVP_MENU' | 'JOIN_INPUT' | 'WAITING' | 'SELECTING';
 
 export class LobbyScreen {
   private container: HTMLDivElement;
   private phase: LobbyPhase = 'MENU';
   private ws: WebSocket | null = null;
+  private music: LobbyMusic;
+  private selectionScreen: SelectionScreen | null = null;
+  private pvpRoster: CharacterConfig[] = [];
 
   constructor(private onGameReady: (mode: GameMode) => void) {
     this.container = document.createElement('div');
@@ -17,10 +24,16 @@ export class LobbyScreen {
       background: 'var(--theme-lobby-bg)', fontFamily: 'sans-serif', zIndex: '500',
     });
     document.body.appendChild(this.container);
+
+    this.music = new LobbyMusic();
+    this.music.start();
+
     this.render();
   }
 
   dispose(): void {
+    this.music.dispose();
+    this.selectionScreen?.dispose();
     this.container.remove();
   }
 
@@ -35,15 +48,13 @@ export class LobbyScreen {
       case 'PVP_MENU':   return this.renderPvpMenu();
       case 'JOIN_INPUT': return this.renderJoinInput();
       case 'WAITING':    return this.renderWaiting('Waiting for opponent…');
+      case 'SELECTING':  return; // SelectionScreen is mounted separately
     }
   }
 
   private renderMenu(): void {
     this.title('SRPG Demo');
-    this.btn('Quick Test (Solo)', () => {
-      this.dispose();
-      this.onGameReady({ kind: 'solo' });
-    });
+    this.btn('Quick Test (Solo)', () => this.startSoloSelection());
     this.btn('PvP', () => {
       this.phase = 'PVP_MENU';
       this.render();
@@ -119,6 +130,26 @@ export class LobbyScreen {
   }
 
   // ---------------------------------------------------------------------------
+  // Solo selection flow
+  // ---------------------------------------------------------------------------
+
+  private startSoloSelection(): void {
+    this.phase = 'SELECTING';
+    this.render(); // clears container
+    this.container.style.display = 'none'; // hide lobby container
+
+    this.selectionScreen = new SelectionScreen(
+      null,
+      allCharacters,
+      null,
+      (selections, board) => {
+        this.dispose();
+        this.onGameReady({ kind: 'solo', selections, board });
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Lobby actions
   // ---------------------------------------------------------------------------
 
@@ -159,20 +190,79 @@ export class LobbyScreen {
     this.ws = new WebSocket(`${WS_BASE}/ws/${code}?team=${team}`);
 
     this.ws.onopen = () => {
-      // Connection established; server will send GAME_START when both players connect.
+      // Connection established; server will send CHAMPION_SELECTION_START when both connect
     };
 
     this.ws.onmessage = (ev: MessageEvent) => {
       const msg = JSON.parse(String(ev.data)) as ServerMessage;
+
+      if (msg.type === 'CHAMPION_SELECTION_START') {
+        this.pvpRoster = msg.payload.characters.map(entry => {
+          const localChar = allCharacters.find(c => c.playerIndex === entry.playerIndex);
+          return {
+            playerIndex: entry.playerIndex,
+            team: 0,  // placeholder; will be set per-player at game start
+            name: entry.name,
+            hp: entry.hp,
+            strength: entry.strength,
+            intellect: entry.intellect,
+            defense: entry.defense,
+            resistance: entry.resistance,
+            moveRange: entry.moveRange,
+            attackRange: entry.attackRange,
+            spritePath: localChar?.spritePath ?? '',
+            startCoord: { col: 0, row: 0 }, // placeholder
+            skills: entry.skills,
+          } satisfies CharacterConfig;
+        });
+        this.startPvpSelection(team);
+        return;
+      }
+
       if (msg.type === 'GAME_START') {
         const ws = this.ws!;
         this.ws = null;
+        const selections: Record<number, number> = Object.fromEntries(
+          Object.entries(msg.payload.selections as Record<string, number>).map(([k, v]) => [Number(k), v]),
+        );
+        const board = (msg.payload.board ?? 'tactical') as import('../core/GameMode').BoardType;
+
+        // Build CharacterConfig[] with correct team + spawn from selections
+        const roster: CharacterConfig[] = (Object.entries(selections) as [string, number][]).map(([teamStr, playerIdx]) => {
+          const base = this.pvpRoster.find(c => c.playerIndex === playerIdx)!;
+          const team = Number(teamStr);
+          return { ...base, team, startCoord: teamSpawnCoords[team] };
+        });
+
+        this.selectionScreen?.dispose();
+        this.selectionScreen = null;
         this.dispose();
-        this.onGameReady({ kind: 'pvp', localTeam: msg.payload.localTeam, ws });
+        this.onGameReady({ kind: 'pvp', localTeam: msg.payload.localTeam, ws, selections, roster, board });
       }
     };
 
     this.ws.onerror = () => this.toast('WebSocket connection failed.');
+  }
+
+  private startPvpSelection(localTeam: number): void {
+    this.phase = 'SELECTING';
+    this.render();
+    this.container.style.display = 'none';
+
+    this.selectionScreen = new SelectionScreen(
+      localTeam,
+      this.pvpRoster,
+      this.ws,
+      (_sel, _board) => {
+        // In PvP, GAME_START from server drives onGameReady.
+        // Show "waiting" UI while server collects both selections.
+        this.selectionScreen?.dispose();
+        this.container.style.display = 'flex';
+        this.phase = 'WAITING';
+        this.container.innerHTML = '';
+        this.renderWaiting('Waiting for opponent to lock in…');
+      },
+    );
   }
 
   // ---------------------------------------------------------------------------
