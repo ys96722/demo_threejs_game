@@ -8,6 +8,7 @@ import { EVENTS } from '../types/events';
 import { Renderer } from '../rendering/Renderer';
 import { CameraController } from '../rendering/CameraController';
 import { Grid } from '../world/Grid';
+import { gridVisuals } from '../world/GridVisuals';
 import { Character } from '../entities/Character';
 import { InputManager } from '../input/InputManager';
 import { MovementSystem } from '../systems/MovementSystem';
@@ -19,6 +20,8 @@ import { gameConfig, characters as characterConfigs } from '../config/gameConfig
 import { computeDisplaceDir, computeAttackDamage } from '../logic/combat';
 import { GameClient } from '../net/GameClient';
 import type { GameMode } from './GameMode';
+import { THEMES } from '../theme/themes';
+import type { ThemeId } from '../theme/themes';
 
 const MAX_DT = 0.1;
 
@@ -35,6 +38,8 @@ export class Game {
   private lastTime: number | null = null;
   private composer: EffectComposer;
   private gameClient: GameClient | null = null;
+  private ambient!: THREE.AmbientLight;
+  private dirLight!: THREE.DirectionalLight;
 
   private hoveredCoord: GridCoord | null = null;
   private reachableCoords = new Set<string>();
@@ -85,15 +90,15 @@ export class Game {
     );
 
     // Lighting
-    const ambient = new THREE.AmbientLight(0xffffff, gameConfig.scene.ambientIntensity);
-    this.scene.add(ambient);
+    this.ambient = new THREE.AmbientLight(0xffffff, gameConfig.scene.ambientIntensity);
+    this.scene.add(this.ambient);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, gameConfig.scene.dirLightIntensity);
-    dirLight.position.set(-6, 12, 4);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    this.scene.add(dirLight);
+    this.dirLight = new THREE.DirectionalLight(0xffffff, gameConfig.scene.dirLightIntensity);
+    this.dirLight.position.set(-6, 12, 4);
+    this.dirLight.castShadow = true;
+    this.dirLight.shadow.mapSize.width = 2048;
+    this.dirLight.shadow.mapSize.height = 2048;
+    this.scene.add(this.dirLight);
 
     // World
     this.grid = new Grid(this.scene);
@@ -461,6 +466,20 @@ export class Game {
       el.textContent = `Team ${team}: ${text}`;
       document.body.appendChild(el);
       el.addEventListener('animationend', () => el.remove());
+    });
+
+    bus.on(EVENTS.THEME_CHANGED, ({ themeId }: { themeId: ThemeId }) => {
+      const t = THEMES[themeId];
+      this.scene.background = new THREE.Color(t.scene.background);
+      if (this.scene.fog instanceof THREE.Fog) {
+        this.scene.fog.color.setHex(t.scene.fogColor);
+      }
+      this.ambient.intensity = t.scene.ambientIntensity;
+      this.dirLight.intensity = t.scene.dirLightIntensity;
+      gridVisuals.applyTheme(t.tiles.light, t.tiles.dark);
+      for (const char of this.characters.values()) {
+        char.setGlowColor(t.glow.r, t.glow.g, t.glow.b);
+      }
     });
   }
 

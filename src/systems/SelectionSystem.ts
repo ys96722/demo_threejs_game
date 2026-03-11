@@ -52,8 +52,8 @@ export class SelectionSystem {
       padding: '8px 12px',
       borderRadius: '4px',
       border: 'none',
-      background: 'rgba(255,255,255,0.15)',
-      color: '#ffffff',
+      background: 'var(--theme-btn-bg)',
+      color: 'var(--theme-btn-color)',
       fontSize: '13px',
       cursor: 'pointer',
     });
@@ -72,7 +72,7 @@ export class SelectionSystem {
       display: 'none',
       flexDirection: 'column',
       gap: '8px',
-      background: 'rgba(0,0,0,0.7)',
+      background: 'var(--theme-panel-bg)',
       padding: '16px',
       borderRadius: '8px',
       fontFamily: 'sans-serif',
@@ -83,7 +83,7 @@ export class SelectionSystem {
     const title = document.createElement('p');
     title.id = 'action-panel-title';
     Object.assign(title.style, {
-      color: '#ffffff',
+      color: 'var(--theme-text)',
       margin: '0 0 8px 0',
       fontWeight: 'bold',
       fontSize: '14px',

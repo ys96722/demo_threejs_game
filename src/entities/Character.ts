@@ -317,6 +317,10 @@ export class Character {
     this.selectionGlow.visible = selected;
   }
 
+  setGlowColor(r: number, g: number, b: number): void {
+    (this.selectionGlow.material as THREE.SpriteMaterial).color.setRGB(r, g, b);
+  }
+
   setTokensVisible(visible: boolean): void {
     this.tokenSprite.visible = visible;
   }

@@ -28,6 +28,14 @@ class GridVisuals {
     return this.materials.get(key)!;
   }
 
+  applyTheme(light: Record<TileState, number>, dark: Partial<Record<TileState, number>>): void {
+    for (const [key, mat] of this.materials) {
+      const isDark = key.endsWith('-dark');
+      const stateKey = (isDark ? key.slice(0, -5) : key.slice(0, -6)) as TileState;
+      mat.color.setHex(isDark ? (dark[stateKey] ?? light[stateKey]) : light[stateKey]);
+    }
+  }
+
   dispose(): void {
     this.materials.forEach((mat) => mat.dispose());
     this.materials.clear();

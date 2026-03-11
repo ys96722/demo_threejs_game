@@ -31,6 +31,7 @@ export const EVENTS = {
   NETWORK_ACTION_REJECTED:     'NETWORK_ACTION_REJECTED',
   OPPONENT_DISCONNECTED:       'OPPONENT_DISCONNECTED',
   CHAT_RECEIVED:               'CHAT_RECEIVED',
+  THEME_CHANGED:               'THEME_CHANGED',
 } as const;
 
 export type EventPayloads = {
@@ -61,6 +62,7 @@ export type EventPayloads = {
   [EVENTS.NETWORK_ACTION_REJECTED]: { reason: string };
   [EVENTS.OPPONENT_DISCONNECTED]: Record<string, never>;
   [EVENTS.CHAT_RECEIVED]: { team: number; text: string };
+  [EVENTS.THEME_CHANGED]: { themeId: 'VOID' | 'EMBER' | 'SPECTER' };
 };
 
 export type EventName = keyof EventPayloads;
