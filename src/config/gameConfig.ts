@@ -1,4 +1,6 @@
 import type { CharacterConfig } from '../types/characters';
+import type { GridCoord } from '../types/grid';
+import type { BoardType } from '../core/GameMode';
 
 export const characters: CharacterConfig[] = [
   // Team 1
@@ -54,4 +56,26 @@ export const gameConfig = {
     ambientIntensity:   0.35,
     dirLightIntensity:  1.1,
   },
+} as const;
+
+// ---------------------------------------------------------------------------
+// Board configs — keyed by BoardType
+// ---------------------------------------------------------------------------
+
+export const BOARD_CONFIGS: Record<BoardType, {
+  cols: number; rows: number; tileSize: number; tileHeight: number; tileGap: number;
+}> = {
+  tactical: { cols: 10, rows: 10, tileSize: 1.0, tileHeight: 0.12, tileGap: 0.04 },
+  go:       { cols: 9,  rows: 9,  tileSize: 1.0, tileHeight: 0.03, tileGap: 0.04 },
+};
+
+export const teamSpawnCoords: Record<number, GridCoord> = {
+  1: { col: 1, row: 1 },
+  2: { col: 8, row: 6 },
+};
+
+// Warm palette for the Go board (light/dark tile colors)
+export const GO_TILE_COLORS = {
+  light: 0x8B6914,
+  dark:  0x6B4E10,
 } as const;
