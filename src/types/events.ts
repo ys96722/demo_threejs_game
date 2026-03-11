@@ -1,5 +1,6 @@
 import type { GridCoord } from './grid';
 import type { EffectPreview } from './characters';
+import type { ThemeId } from '../theme/themes';
 
 export const EVENTS = {
   TILE_HOVER_ENTER: 'TILE_HOVER_ENTER',
@@ -62,7 +63,7 @@ export type EventPayloads = {
   [EVENTS.NETWORK_ACTION_REJECTED]: { reason: string };
   [EVENTS.OPPONENT_DISCONNECTED]: Record<string, never>;
   [EVENTS.CHAT_RECEIVED]: { team: number; text: string };
-  [EVENTS.THEME_CHANGED]: { themeId: 'VOID' | 'EMBER' | 'SPECTER' };
+  [EVENTS.THEME_CHANGED]: { themeId: ThemeId };
 };
 
 export type EventName = keyof EventPayloads;
