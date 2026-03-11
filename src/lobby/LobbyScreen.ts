@@ -1,11 +1,13 @@
 import type { GameMode } from '../core/GameMode';
 import type { ServerMessage } from '../net/protocol';
+import { API_BASE, WS_BASE } from '../config/env';
 
 type LobbyPhase = 'MENU' | 'PVP_MENU' | 'JOIN_INPUT' | 'WAITING';
 
 export class LobbyScreen {
   private container: HTMLDivElement;
   private phase: LobbyPhase = 'MENU';
+  private ws: WebSocket | null = null;
 
   constructor(private onGameReady: (mode: GameMode) => void) {
     this.container = document.createElement('div');
@@ -82,7 +84,7 @@ export class LobbyScreen {
       const code = input.value.trim().toUpperCase();
       if (!code) { errDiv.textContent = 'Enter a code first.'; return; }
       try {
-        const res = await fetch('/lobby/join', {
+        const res = await fetch(`${API_BASE}/lobby/join`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code }),
@@ -107,6 +109,13 @@ export class LobbyScreen {
     p.textContent = msg;
     Object.assign(p.style, { color: '#aaa', fontSize: '18px' });
     this.container.appendChild(p);
+
+    this.btn('← Cancel', () => {
+      this.ws?.close();
+      this.ws = null;
+      this.phase = 'PVP_MENU';
+      this.render();
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -115,7 +124,7 @@ export class LobbyScreen {
 
   private async handleCreateLobby(): Promise<void> {
     try {
-      const res = await fetch('/lobby/create', { method: 'POST' });
+      const res = await fetch(`${API_BASE}/lobby/create`, { method: 'POST' });
       const data = await res.json() as { code: string };
       this.phase = 'WAITING';
       this.render();
@@ -147,22 +156,23 @@ export class LobbyScreen {
   }
 
   private connectWs(code: string, team: number): void {
-    const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${protocol}://${location.host}/ws/${code}?team=${team}`);
+    this.ws = new WebSocket(`${WS_BASE}/ws/${code}?team=${team}`);
 
-    ws.onopen = () => {
+    this.ws.onopen = () => {
       // Connection established; server will send GAME_START when both players connect.
     };
 
-    ws.onmessage = (ev: MessageEvent) => {
+    this.ws.onmessage = (ev: MessageEvent) => {
       const msg = JSON.parse(String(ev.data)) as ServerMessage;
       if (msg.type === 'GAME_START') {
+        const ws = this.ws!;
+        this.ws = null;
         this.dispose();
         this.onGameReady({ kind: 'pvp', localTeam: msg.payload.localTeam, ws });
       }
     };
 
-    ws.onerror = () => this.toast('WebSocket connection failed.');
+    this.ws.onerror = () => this.toast('WebSocket connection failed.');
   }
 
   // ---------------------------------------------------------------------------
