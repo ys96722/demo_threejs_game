@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TileState } from '../types/grid';
 
-const TILE_COLORS_LIGHT: Record<TileState, number> = {
+export const TILE_COLORS_LIGHT: Record<TileState, number> = {
   [TileState.Default]:         0x2d3f5c,
   [TileState.Hover]:           0x4a90d9,
   [TileState.Selected]:        0xf08844,
@@ -11,7 +11,7 @@ const TILE_COLORS_LIGHT: Record<TileState, number> = {
   [TileState.ReachableAttack]: 0x2d5e6e,
 };
 
-const TILE_COLORS_DARK: Partial<Record<TileState, number>> = {
+export const TILE_COLORS_DARK: Partial<Record<TileState, number>> = {
   [TileState.Default]:  0x1a2638,
 };
 

@@ -1,7 +1,7 @@
 """Tests for GameState action handlers in game_state.py."""
 
 import pytest
-from game_state import GameState, CharacterState, build_initial_game_state
+from game_state import GameState, CharacterState, build_initial_game_state, ALL_CHARACTERS
 from game_logic import Coord
 
 
@@ -293,3 +293,65 @@ class TestCheckGameOver:
     def test_build_initial_game_state_no_winner(self):
         gs = build_initial_game_state()
         assert gs.check_game_over() is None
+
+
+# ---------------------------------------------------------------------------
+# Champion selection + build_initial_game_state
+# ---------------------------------------------------------------------------
+
+class TestChampionSelection:
+    def test_all_chars_included_by_default(self):
+        gs = build_initial_game_state()
+        assert len(gs.characters) == len(ALL_CHARACTERS)
+
+    def test_selection_filters_to_one_per_team(self):
+        # Team 1 picks Seonjae (playerIndex=1), Team 2 picks Mina (playerIndex=2)
+        gs = build_initial_game_state(selections={1: 1, 2: 2})
+        indices = {c.player_index for c in gs.characters}
+        assert indices == {1, 2}
+
+    def test_selection_filters_alternate_chars(self):
+        # Team 1 picks Aerin (playerIndex=3), Team 2 picks Isma (playerIndex=4)
+        gs = build_initial_game_state(selections={1: 3, 2: 4})
+        indices = {c.player_index for c in gs.characters}
+        assert indices == {3, 4}
+
+    def test_selection_stores_on_game_state(self):
+        gs = build_initial_game_state(selections={1: 1, 2: 2})
+        assert gs.selections == {1: 1, 2: 2}
+
+    def test_empty_selection_includes_all(self):
+        gs = build_initial_game_state(selections={})
+        assert len(gs.characters) == len(ALL_CHARACTERS)
+
+    def test_board_default_is_tactical(self):
+        gs = build_initial_game_state()
+        assert gs.board == 'tactical'
+
+    def test_board_go_propagated(self):
+        gs = build_initial_game_state(board='go')
+        assert gs.board == 'go'
+
+    def test_game_start_payload_includes_selections_and_board(self):
+        gs = build_initial_game_state(selections={1: 1, 2: 2}, board='go')
+        payload = gs.to_game_start_payload(local_team=1)
+        assert payload['localTeam'] == 1
+        assert payload['board'] == 'go'
+        assert '1' in payload['selections']
+        assert '2' in payload['selections']
+        assert payload['selections']['1'] == 1
+        assert payload['selections']['2'] == 2
+
+    def test_selected_char_preserves_stats(self):
+        gs = build_initial_game_state(selections={1: 1, 2: 2})
+        seonjae = next(c for c in gs.characters if c.player_index == 1)
+        assert seonjae.hp == 100
+        assert seonjae.strength == 10
+        assert seonjae.move_range == 6
+
+    def test_selected_chars_are_independent_copies(self):
+        """Mutations on one game state must not affect another."""
+        gs1 = build_initial_game_state(selections={1: 1, 2: 2})
+        gs2 = build_initial_game_state(selections={1: 1, 2: 2})
+        gs1.characters[0].hp = 1
+        assert gs2.characters[0].hp == 100

@@ -8,7 +8,7 @@ import { EVENTS } from '../types/events';
 import { Renderer } from '../rendering/Renderer';
 import { CameraController } from '../rendering/CameraController';
 import { Grid } from '../world/Grid';
-import { gridVisuals } from '../world/GridVisuals';
+import { gridVisuals, TILE_COLORS_LIGHT, TILE_COLORS_DARK } from '../world/GridVisuals';
 import { Character } from '../entities/Character';
 import { InputManager } from '../input/InputManager';
 import { MovementSystem } from '../systems/MovementSystem';
@@ -16,12 +16,12 @@ import { SelectionSystem } from '../systems/SelectionSystem';
 import { TurnManager } from './TurnManager';
 import { TileState } from '../types/grid';
 import type { GridCoord } from '../types/grid';
-import { gameConfig, characters as characterConfigs } from '../config/gameConfig';
+import { gameConfig, characters as allCharacterConfigs, BOARD_CONFIGS, GO_TILE_COLORS, teamSpawnCoords } from '../config/gameConfig';
+import type { CharacterConfig } from '../types/characters';
 import { computeDisplaceDir, computeAttackDamage } from '../logic/combat';
 import { GameClient } from '../net/GameClient';
 import type { GameMode } from './GameMode';
 import { THEMES } from '../theme/themes';
-import type { ThemeId } from '../theme/themes';
 
 const MAX_DT = 0.1;
 
@@ -53,7 +53,7 @@ export class Game {
   // in PvP mode by TURN_CHANGED events forwarded from the server via GameClient.
   private activeTeam: number;
 
-  constructor(private mode: GameMode = { kind: 'solo' }) {
+  constructor(private mode: GameMode = { kind: 'solo', selections: { 1: 1, 2: 2 }, board: 'tactical' }) {
     // Inject chat float animation once
     const style = document.createElement('style');
     style.textContent = `
@@ -100,8 +100,33 @@ export class Game {
     this.dirLight.shadow.mapSize.height = 2048;
     this.scene.add(this.dirLight);
 
+    // Apply board config before creating the grid
+    const bc = BOARD_CONFIGS[mode.board];
+    Object.assign(gameConfig.grid, bc);
+
     // World
     this.grid = new Grid(this.scene);
+
+    // Apply Go board tile colors if needed (override Default colors, keep rest the same)
+    if (mode.board === 'go') {
+      const goLight = { ...TILE_COLORS_LIGHT, [TileState.Default]: GO_TILE_COLORS.light };
+      const goDark = { ...TILE_COLORS_DARK, [TileState.Default]: GO_TILE_COLORS.dark };
+      gridVisuals.applyTheme(goLight, goDark);
+    }
+
+    // Build character configs based on mode
+    let characterConfigs: CharacterConfig[];
+    if (mode.kind === 'pvp') {
+      // roster already has correct team + startCoord, built by LobbyScreen
+      characterConfigs = mode.roster;
+    } else {
+      // Solo: build from local config, re-assign team + spawn coord
+      characterConfigs = (Object.entries(mode.selections) as [string, number][]).map(([teamStr, playerIdx]) => {
+        const cfg = allCharacterConfigs.find(c => c.playerIndex === playerIdx)!;
+        const team = Number(teamStr);
+        return { ...cfg, team, startCoord: teamSpawnCoords[team] ?? cfg.startCoord };
+      });
+    }
 
     // Characters — built from config; adding a 3rd character only requires a config entry
     for (const cfg of characterConfigs) {
@@ -113,7 +138,7 @@ export class Game {
     }
 
     // Turn manager cycles over unique teams, not individual character indices
-    const teams = [...new Set(characterConfigs.map(c => c.team))];
+    const teams = [...new Set(characterConfigs.map((c: { team: number }) => c.team))];
     this.turnManager = new TurnManager(teams);
     this.activeTeam = this.turnManager.activePlayer;
 
@@ -468,9 +493,11 @@ export class Game {
       el.addEventListener('animationend', () => el.remove());
     });
 
-    bus.on(EVENTS.THEME_CHANGED, ({ themeId }: { themeId: ThemeId }) => {
+    bus.on(EVENTS.THEME_CHANGED, ({ themeId }) => {
       const t = THEMES[themeId];
-      this.scene.background = new THREE.Color(t.scene.background);
+      if (this.scene.background instanceof THREE.Color) {
+        this.scene.background.setHex(t.scene.background);
+      }
       if (this.scene.fog instanceof THREE.Fog) {
         this.scene.fog.color.setHex(t.scene.fogColor);
       }
