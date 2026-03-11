@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from lobby_manager import lobby_manager
 from connection_manager import connection_manager
+from game_state import build_initial_game_state, available_roster
 
 app = FastAPI()
 
@@ -66,14 +67,14 @@ async def websocket_endpoint(ws: WebSocket, code: str, team: int) -> None:
     room = connection_manager.get_room(code)
     room.add(team, ws)
 
-    try:
-        # Once both players are connected, start the game
-        if room.is_full():
-            game_state = lobby_manager.start_game(code)
-            snapshot = game_state.to_snapshot()
+    # Track per-room champion selections: {code: {team: (characterIndex, board)}}
+    if not hasattr(room, 'champion_selections'):
+        room.champion_selections = {}  # type: ignore[attr-defined]
 
-            await room.send(1, {"type": "GAME_START", "payload": {"localTeam": 1, "initialState": snapshot}})
-            await room.send(2, {"type": "GAME_START", "payload": {"localTeam": 2, "initialState": snapshot}})
+    try:
+        # Once both players are connected, start champion selection phase
+        if room.is_full():
+            await room.broadcast({"type": "CHAMPION_SELECTION_START", "payload": {"characters": available_roster()}})
 
         # Game loop: receive action messages from this client
         while True:
@@ -105,6 +106,29 @@ async def handle_action(code: str, team: int, msg: dict) -> None:
         text = payload.get("text", "").strip()[:200]
         if text:
             await room.broadcast({"type": "CHAT", "payload": {"team": team, "text": text}})
+        return
+
+    if msg_type == "CHAMPION_SELECTED":
+        char_index = payload.get("characterIndex")
+        board = payload.get("board", "")
+        if not hasattr(room, 'champion_selections'):
+            room.champion_selections = {}  # type: ignore[attr-defined]
+        room.champion_selections[team] = (char_index, board)  # type: ignore[attr-defined]
+
+        # When both teams have selected, start the game
+        if len(room.champion_selections) == 2:  # type: ignore[attr-defined]
+            selections: dict[int, int] = {
+                t: idx for t, (idx, _) in room.champion_selections.items()  # type: ignore[attr-defined]
+            }
+            chosen_board = 'tactical'
+
+            game_state = build_initial_game_state(selections=selections, board=chosen_board)
+            lobby = lobby_manager.get(code)
+            if lobby:
+                lobby.game_state = game_state
+
+            await room.send(1, {"type": "GAME_START", "payload": game_state.to_game_start_payload(1)})
+            await room.send(2, {"type": "GAME_START", "payload": game_state.to_game_start_payload(2)})
         return
 
     lobby = lobby_manager.get(code)

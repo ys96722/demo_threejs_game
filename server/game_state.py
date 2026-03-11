@@ -61,12 +61,37 @@ class CharacterState:
             "actionTokens": self.action_tokens,
         }
 
+    def to_roster_entry(self) -> dict:
+        return {
+            "playerIndex": self.player_index,
+            "name": self.name,
+            "hp": self.hp,
+            "maxHp": self.max_hp,
+            "strength": self.strength,
+            "intellect": self.intellect,
+            "defense": self.defense,
+            "resistance": self.resistance,
+            "moveRange": self.move_range,
+            "attackRange": self.attack_range,
+            "skills": [
+                {
+                    "name": s,
+                    "range": SKILL_DEFS[s]["range"],
+                    "targetType": SKILL_DEFS[s]["target_type"],
+                }
+                for s in self.skills
+                if s in SKILL_DEFS
+            ],
+        }
+
 
 @dataclass
 class GameState:
     characters: list[CharacterState]
     active_team: int = 1
     turn_count: int = 1
+    selections: dict[int, int] = field(default_factory=dict)  # team → playerIndex
+    board: str = 'tactical'
 
     # ------------------------------------------------------------------
     # Queries
@@ -236,45 +261,83 @@ class GameState:
             "turnCount": self.turn_count,
         }
 
+    def to_game_start_payload(self, local_team: int) -> dict:
+        """Full GAME_START payload including selections and board."""
+        return {
+            "localTeam": local_team,
+            "initialState": self.to_snapshot(),
+            "selections": {str(k): v for k, v in self.selections.items()},
+            "board": self.board,
+        }
+
 
 # ---------------------------------------------------------------------------
-# Factory — mirrors src/config/gameConfig.ts `characters` array
+# Character roster — mirrors src/config/gameConfig.ts `characters` array
 # ---------------------------------------------------------------------------
 
-def build_initial_game_state() -> GameState:
+ALL_CHARACTERS: list[CharacterState] = [
+    # Team 1
+    CharacterState(
+        player_index=1, team=1, name="Seonjae",
+        coord=Coord(col=1, row=1), hp=100, max_hp=100,
+        strength=10, intellect=8, defense=1, base_defense=1,
+        resistance=1, move_range=6, attack_range=2,
+        skills=["Reveille of Black Cranes"],
+    ),
+    CharacterState(
+        player_index=3, team=1, name="Aerin",
+        coord=Coord(col=1, row=3), hp=90, max_hp=90,
+        strength=7, intellect=3, defense=3, base_defense=3,
+        resistance=2, move_range=5, attack_range=1,
+        skills=[],
+    ),
+    # Team 2
+    CharacterState(
+        player_index=2, team=2, name="Mina",
+        coord=Coord(col=8, row=6), hp=100, max_hp=100,
+        strength=1, intellect=1, defense=1, base_defense=1,
+        resistance=1, move_range=4, attack_range=1,
+        skills=["Abrazo o Desprecio (Embrace or Exile)"],
+    ),
+    CharacterState(
+        player_index=4, team=2, name="Isma",
+        coord=Coord(col=8, row=8), hp=130, max_hp=130,
+        strength=4, intellect=5, defense=5, base_defense=5,
+        resistance=4, move_range=3, attack_range=1,
+        skills=[],
+    ),
+]
+
+
+TEAM_SPAWN: dict[int, Coord] = {1: Coord(col=1, row=1), 2: Coord(col=8, row=6)}
+
+
+def available_roster() -> list[dict]:
+    return [c.to_roster_entry() for c in ALL_CHARACTERS]
+
+
+def build_initial_game_state(selections: Optional[dict[int, int]] = None, board: str = 'tactical') -> GameState:
+    """Build a GameState filtered to only the selected characters (one per team).
+
+    selections: {team: playerIndex} — if None or empty, all characters are included.
+    board: 'tactical' or 'go'
+    """
+    import copy
+    if selections:
+        chars = []
+        for team, player_idx in selections.items():
+            base = next((copy.copy(c) for c in ALL_CHARACTERS if c.player_index == player_idx), None)
+            if base:
+                base.team = team
+                base.coord = TEAM_SPAWN.get(team, base.coord)
+                chars.append(base)
+    else:
+        chars = [copy.copy(c) for c in ALL_CHARACTERS]
+
     return GameState(
         active_team=1,
         turn_count=1,
-        characters=[
-            # Team 1
-            CharacterState(
-                player_index=1, team=1, name="Seonjae",
-                coord=Coord(col=1, row=1), hp=100, max_hp=100,
-                strength=10, intellect=8, defense=1, base_defense=1,
-                resistance=1, move_range=6, attack_range=2,
-                skills=["Reveille of Black Cranes"],
-            ),
-            CharacterState(
-                player_index=3, team=1, name="Aerin",
-                coord=Coord(col=1, row=3), hp=90, max_hp=90,
-                strength=7, intellect=3, defense=3, base_defense=3,
-                resistance=2, move_range=5, attack_range=1,
-                skills=[],
-            ),
-            # Team 2
-            CharacterState(
-                player_index=2, team=2, name="Mina",
-                coord=Coord(col=8, row=6), hp=100, max_hp=100,
-                strength=1, intellect=1, defense=1, base_defense=1,
-                resistance=1, move_range=4, attack_range=1,
-                skills=["Abrazo o Desprecio (Embrace or Exile)"],
-            ),
-            CharacterState(
-                player_index=4, team=2, name="Isma",
-                coord=Coord(col=8, row=8), hp=130, max_hp=130,
-                strength=4, intellect=5, defense=5, base_defense=5,
-                resistance=4, move_range=3, attack_range=1,
-                skills=[],
-            ),
-        ],
+        characters=chars,
+        selections=selections or {},
+        board=board,
     )
