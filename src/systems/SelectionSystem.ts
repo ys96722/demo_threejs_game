@@ -13,6 +13,7 @@ export class SelectionSystem {
   private activeSkill: SkillDef | null = null;
   private actionPanel: HTMLDivElement;
   private previewTargetIndex: number | null = null;
+  private previewTargetTeam: number | null = null;
 
   constructor(
     private getCharacter: (idx: number) => Character | undefined,
@@ -203,7 +204,8 @@ export class SelectionSystem {
       if (!enemy || dist > caster.attackRange) return;
       const damage = computeAttackDamage(caster, enemy);
       this.previewTargetIndex = enemy.playerIndex;
-      bus.emit(EVENTS.TARGET_PREVIEW_START, { targetPlayerIndex: enemy.playerIndex, preview: { type: 'damage', amount: damage } });
+      this.previewTargetTeam = enemy.team;
+      bus.emit(EVENTS.TARGET_PREVIEW_START, { targetPlayerIndex: enemy.playerIndex, targetTeam: enemy.team, preview: { type: 'damage', amount: damage } });
       return;
     }
 
@@ -223,7 +225,8 @@ export class SelectionSystem {
       const preview = this.getSkillPreview?.(this.selectedPlayerIndex, skill.name, coord);
       if (!preview) return;
       this.previewTargetIndex = target.playerIndex;
-      bus.emit(EVENTS.TARGET_PREVIEW_START, { targetPlayerIndex: target.playerIndex, preview });
+      this.previewTargetTeam = target.team;
+      bus.emit(EVENTS.TARGET_PREVIEW_START, { targetPlayerIndex: target.playerIndex, targetTeam: target.team, preview });
     }
   };
 
@@ -232,9 +235,10 @@ export class SelectionSystem {
   };
 
   private clearPreview(): void {
-    if (this.previewTargetIndex !== null) {
-      bus.emit(EVENTS.TARGET_PREVIEW_END, { targetPlayerIndex: this.previewTargetIndex });
+    if (this.previewTargetIndex !== null && this.previewTargetTeam !== null) {
+      bus.emit(EVENTS.TARGET_PREVIEW_END, { targetPlayerIndex: this.previewTargetIndex, targetTeam: this.previewTargetTeam });
       this.previewTargetIndex = null;
+      this.previewTargetTeam = null;
     }
   }
 
