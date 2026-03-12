@@ -1,9 +1,9 @@
 // ─── Swap these filenames to change the music ───────────────────────────────
 export const MUSIC_FILES = {
-  LOBBY:     '/music/Azure Glass Lobby.wav',//'/music/Echoes of the Chosen.wav',
-  SELECTION: '/music/Celestial Vow.wav',//'/music/selection.mp3',
-  GAME:      '/music/Binary Dawn Tactics.wav',//'/music/game.mp3',
-} as const;
+  LOBBY:     `${import.meta.env.BASE_URL}music/Azure Glass Lobby.wav`,
+  SELECTION: `${import.meta.env.BASE_URL}music/Celestial Vow.wav`,
+  GAME:      `${import.meta.env.BASE_URL}music/Binary Dawn Tactics.wav`,
+};
 // ────────────────────────────────────────────────────────────────────────────
 
 let masterVolume: number = parseFloat(localStorage.getItem('srpg-volume') ?? '0.4');
