@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-See **`PROJECT.md`** for stack, hosting (GitHub Pages + Railway), environment variables, and deploy steps.
+See **`PROJECT.md`** for stack, hosting (GitHub Pages + Render), environment variables, and deploy steps.
 
 ## Commands
 
