@@ -54,8 +54,8 @@ export type EventPayloads = {
   [EVENTS.SKILL_TARGETING_START]: { playerIndex: number; range: number };
   [EVENTS.SKILL_TARGETING_CANCELLED]: { playerIndex: number };
   [EVENTS.SKILL_HIT]: { casterIndex: number; skillName: string; targetCoord: GridCoord };
-  [EVENTS.TARGET_PREVIEW_START]: { targetPlayerIndex: number; preview: EffectPreview };
-  [EVENTS.TARGET_PREVIEW_END]: { targetPlayerIndex: number };
+  [EVENTS.TARGET_PREVIEW_START]: { targetPlayerIndex: number; targetTeam: number; preview: EffectPreview };
+  [EVENTS.TARGET_PREVIEW_END]: { targetPlayerIndex: number; targetTeam: number };
   [EVENTS.ATTACK_INTENT]: { attackerIndex: number; targetCoord: GridCoord };
   [EVENTS.MOVE_INTENT]: { characterIndex: number; from: GridCoord; to: GridCoord };
   [EVENTS.SPEND_ACTION_INTENT]: { playerIndex: number };

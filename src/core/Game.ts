@@ -33,7 +33,7 @@ export class Game {
   private cameraController: CameraController;
   private scene: THREE.Scene;
   private grid: Grid;
-  private characters: Map<number, Character> = new Map();
+  private characters: Map<string, Character> = new Map();
   private turnManager: TurnManager;
   private inputManager: InputManager;
   private selectionSystem: SelectionSystem;
@@ -53,6 +53,8 @@ export class Game {
   // Tracks the currently active team — updated in solo mode by TurnManager and
   // in PvP mode by TURN_CHANGED events forwarded from the server via GameClient.
   private activeTeam: number;
+
+  private charKey(team: number, idx: number): string { return `${team}_${idx}`; }
 
   constructor(private mode: GameMode = { kind: 'solo', selections: { 1: 1, 2: 2 }, board: 'tactical' }) {
     // Inject chat float animation once
@@ -132,7 +134,7 @@ export class Game {
     // Characters — built from config; adding a 3rd character only requires a config entry
     for (const cfg of characterConfigs) {
       const char = new Character(cfg);
-      this.characters.set(cfg.playerIndex, char);
+      this.characters.set(this.charKey(cfg.team, cfg.playerIndex), char);
       this.scene.add(char.group);
       this.grid.getTile(cfg.startCoord)?.setState(TileState.Occupied);
       char.onMoveComplete = (coord) => bus.emit(EVENTS.CHARACTER_MOVE_END, { coord });
@@ -156,7 +158,7 @@ export class Game {
     // Systems
     this.rangeSystem = new RangeVisualizationSystem(
       this.grid,
-      (idx) => this.characters.get(idx),
+      (idx) => this.characters.get(this.charKey(this.activeTeam, idx)),
     );
     this.inputManager = new InputManager(
       this.renderer.canvas,
@@ -164,10 +166,10 @@ export class Game {
       this.grid.tileMeshes
     );
     this.selectionSystem = new SelectionSystem(
-      (idx) => this.characters.get(idx),
+      (idx) => this.characters.get(this.charKey(this.activeTeam, idx)),
       (coord) => this.rangeSystem.isReachable(coord),
       (coord, attackerIdx) => {
-        const attacker = this.characters.get(attackerIdx);
+        const attacker = this.characters.get(this.charKey(this.activeTeam, attackerIdx));
         if (!attacker) return undefined;
         return [...this.characters.values()].find(
           c => c.team !== attacker.team && c.coord.col === coord.col && c.coord.row === coord.row
@@ -183,7 +185,7 @@ export class Game {
       },
       (casterIndex, skillName, targetCoord) => {
         if (skillName === SKILL_NAMES.ABRAZO) {
-          const caster = this.characters.get(casterIndex);
+          const caster = this.characters.get(this.charKey(this.activeTeam, casterIndex));
           if (!caster) return false;
           const target = [...this.characters.values()].find(
             c => c.playerIndex !== casterIndex &&
@@ -201,7 +203,7 @@ export class Game {
           return { type: 'buff', stat: 'Defense', amount: 10 };
         }
         if (skillName === SKILL_NAMES.ABRAZO) {
-          const caster = this.characters.get(casterIndex);
+          const caster = this.characters.get(this.charKey(this.activeTeam, casterIndex));
           if (!caster) return null;
           const target = [...this.characters.values()].find(
             c => c.playerIndex !== casterIndex &&
@@ -221,11 +223,11 @@ export class Game {
 
     // Event subscriptions
     bus.on(EVENTS.CHARACTER_SELECTED, ({ playerIndex }) => {
-      this.characters.get(playerIndex)?.setSelected(true);
+      this.characters.get(this.charKey(this.activeTeam, playerIndex))?.setSelected(true);
     });
 
     bus.on(EVENTS.CHARACTER_DESELECTED, ({ playerIndex }) => {
-      this.characters.get(playerIndex)?.setSelected(false);
+      this.characters.get(this.charKey(this.activeTeam, playerIndex))?.setSelected(false);
     });
 
     bus.on(EVENTS.CHARACTER_MOVE_START, ({ from, to }) => {
@@ -247,7 +249,7 @@ export class Game {
         this.gameClient?.send({ type: 'SKILL', payload: { casterIndex, skillName, targetCoord } });
         return;
       }
-      const caster = this.characters.get(casterIndex);
+      const caster = this.characters.get(this.charKey(this.activeTeam, casterIndex));
       if (!caster) return;
       const target = [...this.characters.values()].find(
         c => c.playerIndex !== casterIndex &&
@@ -274,7 +276,7 @@ export class Game {
         this.gameClient?.send({ type: 'ATTACK', payload: { attackerIndex, targetCoord } });
         return;
       }
-      const attacker = this.characters.get(attackerIndex);
+      const attacker = this.characters.get(this.charKey(this.activeTeam, attackerIndex));
       if (!attacker) return;
       const enemy = [...this.characters.values()].find(
         c => c.team !== attacker.team &&
@@ -297,7 +299,7 @@ export class Game {
         bus.emit(EVENTS.CHARACTER_DESELECTED, { playerIndex: characterIndex });
         return;
       }
-      const char = this.characters.get(characterIndex);
+      const char = this.characters.get(this.charKey(this.activeTeam, characterIndex));
       if (!char) return;
       char.moveTokens -= 1;
       char.updateTokenDisplay();
@@ -312,7 +314,7 @@ export class Game {
         this.gameClient?.send({ type: 'SPEND_ACTION', payload: { playerIndex } });
         return;
       }
-      const char = this.characters.get(playerIndex);
+      const char = this.characters.get(this.charKey(this.activeTeam, playerIndex));
       if (!char) return;
       char.actionTokens -= 1;
       char.moveTokens = 0;
@@ -320,12 +322,12 @@ export class Game {
       bus.emit(EVENTS.ACTION_USED, { playerIndex });
     });
 
-    bus.on(EVENTS.TARGET_PREVIEW_START, ({ targetPlayerIndex, preview }) => {
-      this.characters.get(targetPlayerIndex)?.showEffectPreview(preview);
+    bus.on(EVENTS.TARGET_PREVIEW_START, ({ targetPlayerIndex, targetTeam, preview }) => {
+      this.characters.get(this.charKey(targetTeam, targetPlayerIndex))?.showEffectPreview(preview);
     });
 
-    bus.on(EVENTS.TARGET_PREVIEW_END, ({ targetPlayerIndex }) => {
-      this.characters.get(targetPlayerIndex)?.clearEffectPreview();
+    bus.on(EVENTS.TARGET_PREVIEW_END, ({ targetPlayerIndex, targetTeam }) => {
+      this.characters.get(this.charKey(targetTeam, targetPlayerIndex))?.clearEffectPreview();
     });
 
     bus.on(EVENTS.TURN_CHANGED, ({ player, turnCount }) => {

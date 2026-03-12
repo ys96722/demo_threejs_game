@@ -6,7 +6,7 @@ import type { ClientMessage, ServerMessage, GameStateSnapshot } from './protocol
 export class GameClient {
   constructor(
     private ws: WebSocket,
-    private characters: Map<number, Character>,
+    private characters: Map<string, Character>,
   ) {
     ws.onmessage = (ev: MessageEvent) => this.handleMessage(ev);
     ws.onclose = () => bus.emit(EVENTS.OPPONENT_DISCONNECTED, {});
@@ -56,7 +56,7 @@ export class GameClient {
 
   private applyStateUpdate(snapshot: GameStateSnapshot): void {
     for (const cs of snapshot.characters) {
-      const char = this.characters.get(cs.playerIndex);
+      const char = this.characters.get(`${cs.team}_${cs.playerIndex}`);
       if (!char) continue;
 
       // Trigger movement animation if the character's position changed on the server.
