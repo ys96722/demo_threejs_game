@@ -24,6 +24,7 @@ import { GameClient } from '../net/GameClient';
 import type { GameMode } from './GameMode';
 import { THEMES } from '../theme/themes';
 import { SKILL_NAMES } from '../types/skills';
+import { MusicPlayer, MUSIC_FILES } from '../audio/MusicPlayer';
 
 const MAX_DT = 0.1;
 
@@ -47,6 +48,7 @@ export class Game {
   private turnCounter: HTMLDivElement;
   private turnIndicator: HTMLDivElement;
   private chatInput: HTMLInputElement;
+  private music = new MusicPlayer();
 
   // Tracks the currently active team — updated in solo mode by TurnManager and
   // in PvP mode by TURN_CHANGED events forwarded from the server via GameClient.
@@ -444,6 +446,8 @@ export class Game {
         char.setGlowColor(t.glow.r, t.glow.g, t.glow.b);
       }
     });
+
+    this.music.play(MUSIC_FILES.GAME);
   }
 
   private handleChatKeyDown = (e: KeyboardEvent): void => {
@@ -483,6 +487,7 @@ export class Game {
   }
 
   dispose(): void {
+    this.music.dispose();
     this.inputManager.dispose();
     this.selectionSystem.dispose();
     this.movementSystem.dispose();

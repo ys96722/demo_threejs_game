@@ -2,6 +2,7 @@ import type { BoardType } from '../core/GameMode';
 import type { CharacterConfig } from '../types/characters';
 import type { ClientMessage } from '../net/protocol';
 import { playHoverSfx, playLockInSfx } from '../audio/GameSfx';
+import { MusicPlayer, MUSIC_FILES } from '../audio/MusicPlayer';
 
 type SelectionPhase = 'CHAMPION_T1' | 'CHAMPION_T2';
 
@@ -12,6 +13,7 @@ type SelectionPhase = 'CHAMPION_T1' | 'CHAMPION_T2';
 export class SelectionScreen {
   private container: HTMLDivElement;
   private phase: SelectionPhase;
+  private music = new MusicPlayer();
   private selectedChampionByTeam: Record<number, number | null> = { 1: null, 2: null };
 
   /**
@@ -34,6 +36,7 @@ export class SelectionScreen {
       gap: '0',
     });
     document.body.appendChild(this.container);
+    this.music.play(MUSIC_FILES.SELECTION);
 
     // Solo: T1 picks first, then T2, then board
     // PvP: local team picks, then board (opponent picks simultaneously on their client)
@@ -42,6 +45,7 @@ export class SelectionScreen {
   }
 
   dispose(): void {
+    this.music.dispose();
     this.container.remove();
   }
 
