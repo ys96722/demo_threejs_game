@@ -2,7 +2,8 @@
 export const MUSIC_FILES = {
   LOBBY:     `${import.meta.env.BASE_URL}music/Azure Glass Lobby.wav`,
   SELECTION: `${import.meta.env.BASE_URL}music/Celestial Vow.wav`,
-  GAME:      `${import.meta.env.BASE_URL}music/Binary Dawn Tactics.wav`,
+  GAME:      `${import.meta.env.BASE_URL}music/Te amo 4.wav`,
+  // Note: Binary Dawn Tactics.wav for actual. Update later
 };
 // ────────────────────────────────────────────────────────────────────────────
 
