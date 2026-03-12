@@ -75,4 +75,10 @@ describe('validateDisplace', () => {
     // caster at row 5, enemy at row 0 → push dest row -1 (off grid)
     expect(validateDisplace(caster(5, 5), enemy(5, 0), gridIsValid, occupied)).toBe(false);
   });
+
+  it('allows pull when ally is at grid edge (pull moves toward caster, not off-grid)', () => {
+    const occupied = () => false;
+    // ally at col 9 (right edge), caster at col 3 → pull dc = sign(3-9) = -1 → dest col 8 (valid)
+    expect(validateDisplace(caster(3, 5), ally(9, 5), gridIsValid, occupied)).toBe(true);
+  });
 });
