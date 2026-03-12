@@ -13,6 +13,7 @@ import { Character } from '../entities/Character';
 import { InputManager } from '../input/InputManager';
 import { MovementSystem } from '../systems/MovementSystem';
 import { SelectionSystem } from '../systems/SelectionSystem';
+import { RangeVisualizationSystem } from '../systems/RangeVisualizationSystem';
 import { TurnManager } from './TurnManager';
 import { TileState } from '../types/grid';
 import type { GridCoord } from '../types/grid';
@@ -22,6 +23,7 @@ import { computeDisplaceDir, computeAttackDamage } from '../logic/combat';
 import { GameClient } from '../net/GameClient';
 import type { GameMode } from './GameMode';
 import { THEMES } from '../theme/themes';
+import { SKILL_NAMES } from '../types/skills';
 
 const MAX_DT = 0.1;
 
@@ -35,15 +37,12 @@ export class Game {
   private inputManager: InputManager;
   private selectionSystem: SelectionSystem;
   private movementSystem: MovementSystem;
+  private rangeSystem: RangeVisualizationSystem;
   private lastTime: number | null = null;
   private composer: EffectComposer;
   private gameClient: GameClient | null = null;
   private ambient!: THREE.AmbientLight;
   private dirLight!: THREE.DirectionalLight;
-
-  private hoveredCoord: GridCoord | null = null;
-  private reachableCoords = new Set<string>();
-  private attackRangeCoords = new Set<string>();
 
   private turnCounter: HTMLDivElement;
   private turnIndicator: HTMLDivElement;
@@ -153,6 +152,10 @@ export class Game {
     }
 
     // Systems
+    this.rangeSystem = new RangeVisualizationSystem(
+      this.grid,
+      (idx) => this.characters.get(idx),
+    );
     this.inputManager = new InputManager(
       this.renderer.canvas,
       this.cameraController.camera,
@@ -160,7 +163,7 @@ export class Game {
     );
     this.selectionSystem = new SelectionSystem(
       (idx) => this.characters.get(idx),
-      (coord) => this.reachableCoords.has(`${coord.col},${coord.row}`),
+      (coord) => this.rangeSystem.isReachable(coord),
       (coord, attackerIdx) => {
         const attacker = this.characters.get(attackerIdx);
         if (!attacker) return undefined;
@@ -177,7 +180,7 @@ export class Game {
         );
       },
       (casterIndex, skillName, targetCoord) => {
-        if (skillName === 'Abrazo o Desprecio (Embrace or Exile)') {
+        if (skillName === SKILL_NAMES.ABRAZO) {
           const caster = this.characters.get(casterIndex);
           if (!caster) return false;
           const target = [...this.characters.values()].find(
@@ -192,10 +195,10 @@ export class Game {
         return true;
       },
       (casterIndex, skillName, targetCoord) => {
-        if (skillName === 'Reveille of Black Cranes') {
+        if (skillName === SKILL_NAMES.REVEILLE) {
           return { type: 'buff', stat: 'Defense', amount: 10 };
         }
-        if (skillName === 'Abrazo o Desprecio (Embrace or Exile)') {
+        if (skillName === SKILL_NAMES.ABRAZO) {
           const caster = this.characters.get(casterIndex);
           if (!caster) return null;
           const target = [...this.characters.values()].find(
@@ -215,59 +218,15 @@ export class Game {
     );
 
     // Event subscriptions
-    bus.on(EVENTS.TILE_HOVER_ENTER, ({ coord }) => {
-      if (this.hoveredCoord) {
-        const prev = this.grid.getTile(this.hoveredCoord);
-        if (prev && prev.state === TileState.Hover) {
-          prev.setState(this.restoreState(this.hoveredCoord));
-        }
-      }
-      this.hoveredCoord = coord;
-      const tile = this.grid.getTile(coord);
-      if (tile && (tile.state === TileState.Default || tile.state === TileState.Reachable || tile.state === TileState.AttackRange || tile.state === TileState.ReachableAttack)) {
-        tile.setState(TileState.Hover);
-      }
-    });
-
-    bus.on(EVENTS.TILE_HOVER_EXIT, ({ coord }) => {
-      const tile = this.grid.getTile(coord);
-      if (tile && tile.state === TileState.Hover) {
-        tile.setState(this.restoreState(coord));
-      }
-      if (this.hoveredCoord?.col === coord.col && this.hoveredCoord?.row === coord.row) {
-        this.hoveredCoord = null;
-      }
-    });
-
     bus.on(EVENTS.CHARACTER_SELECTED, ({ playerIndex }) => {
-      const char = this.characters.get(playerIndex);
-      if (!char) return;
-      char.setSelected(true);
-      if (char.moveTokens > 0) this.showReachable(char);
-    });
-
-    bus.on(EVENTS.ATTACK_TARGETING_START, ({ playerIndex }) => {
-      const char = this.characters.get(playerIndex);
-      if (!char) return;
-      this.clearReachable();
-      this.showAttackRange(char);
-    });
-
-    bus.on(EVENTS.ATTACK_TARGETING_CANCELLED, ({ playerIndex }) => {
-      this.clearAttackRange();
-      const char = this.characters.get(playerIndex);
-      if (char && char.moveTokens > 0) this.showReachable(char);
+      this.characters.get(playerIndex)?.setSelected(true);
     });
 
     bus.on(EVENTS.CHARACTER_DESELECTED, ({ playerIndex }) => {
       this.characters.get(playerIndex)?.setSelected(false);
-      this.clearReachable();
-      this.clearAttackRange();
     });
 
     bus.on(EVENTS.CHARACTER_MOVE_START, ({ from, to }) => {
-      this.clearReachable();
-      this.clearAttackRange();
       this.grid.getTile(from)?.setState(TileState.Default);
       this.grid.getTile(to)?.setState(TileState.Selected);
     });
@@ -279,29 +238,6 @@ export class Game {
 
     bus.on(EVENTS.ACTION_USED, () => {
       if (this.mode.kind === 'solo') this.checkTurnEnd();
-    });
-
-    bus.on(EVENTS.RANGE_PREVIEW_START, ({ playerIndex, range }) => {
-      const char = this.characters.get(playerIndex);
-      if (!char) return;
-      this.showAttackRange(char, range);
-    });
-
-    bus.on(EVENTS.RANGE_PREVIEW_END, () => {
-      this.clearAttackRange();
-    });
-
-    bus.on(EVENTS.SKILL_TARGETING_START, ({ playerIndex, range }) => {
-      const char = this.characters.get(playerIndex);
-      if (!char) return;
-      this.clearReachable();
-      this.showAttackRange(char, range);
-    });
-
-    bus.on(EVENTS.SKILL_TARGETING_CANCELLED, ({ playerIndex }) => {
-      this.clearAttackRange();
-      const char = this.characters.get(playerIndex);
-      if (char && char.moveTokens > 0) this.showReachable(char);
     });
 
     bus.on(EVENTS.SKILL_HIT, ({ casterIndex, skillName, targetCoord }) => {
@@ -317,9 +253,9 @@ export class Game {
       );
       if (!target) return;
 
-      if (skillName === 'Reveille of Black Cranes') {
+      if (skillName === SKILL_NAMES.REVEILLE) {
         target.defense += 10;
-      } else if (skillName === 'Abrazo o Desprecio (Embrace or Exile)') {
+      } else if (skillName === SKILL_NAMES.ABRAZO) {
         this.applyDisplace(caster, target);
       }
 
@@ -525,66 +461,6 @@ export class Game {
   private isOccupied = (coord: GridCoord): boolean =>
     [...this.characters.values()].some(c => c.coord.col === coord.col && c.coord.row === coord.row);
 
-  private showReachable(char: Character): void {
-    this.clearReachable();
-    for (const tile of this.grid.allTiles()) {
-      const { col, row } = tile.coord;
-      const dist = Math.abs(col - char.coord.col) + Math.abs(row - char.coord.row);
-      if (dist > 0 && dist <= char.moveRange && tile.state !== TileState.Occupied) {
-        tile.setState(TileState.Reachable);
-        this.reachableCoords.add(`${col},${row}`);
-      }
-    }
-  }
-
-  private clearReachable(): void {
-    for (const key of this.reachableCoords) {
-      const [col, row] = key.split(',').map(Number);
-      const tile = this.grid.getTile({ col, row });
-      if (!tile) continue;
-      if (tile.state === TileState.Reachable) tile.setState(TileState.Default);
-      // Tile was in both ranges — degrade to AttackRange only
-      else if (tile.state === TileState.ReachableAttack) tile.setState(TileState.AttackRange);
-    }
-    this.reachableCoords.clear();
-  }
-
-  private showAttackRange(char: Character, range?: number): void {
-    this.clearAttackRange();
-    const r = range ?? char.attackRange;
-    for (const tile of this.grid.allTiles()) {
-      const { col, row } = tile.coord;
-      const dist = Math.abs(col - char.coord.col) + Math.abs(row - char.coord.row);
-      if (dist < 1 || dist > r) continue;
-      this.attackRangeCoords.add(`${col},${row}`);
-      // Upgrade Reachable → ReachableAttack so both ranges are visible
-      if (tile.state === TileState.Reachable) tile.setState(TileState.ReachableAttack);
-      else if (tile.state !== TileState.Occupied) tile.setState(TileState.AttackRange);
-    }
-  }
-
-  private clearAttackRange(): void {
-    for (const key of this.attackRangeCoords) {
-      const [col, row] = key.split(',').map(Number);
-      const tile = this.grid.getTile({ col, row });
-      if (!tile) continue;
-      if (tile.state === TileState.AttackRange) tile.setState(TileState.Default);
-      // Tile was in both ranges — degrade to Reachable only
-      else if (tile.state === TileState.ReachableAttack) tile.setState(TileState.Reachable);
-    }
-    this.attackRangeCoords.clear();
-  }
-
-  private restoreState(coord: GridCoord): TileState {
-    const key = `${coord.col},${coord.row}`;
-    const inMove = this.reachableCoords.has(key);
-    const inAttack = this.attackRangeCoords.has(key);
-    if (inMove && inAttack) return TileState.ReachableAttack;
-    if (inMove) return TileState.Reachable;
-    if (inAttack) return TileState.AttackRange;
-    return TileState.Default;
-  }
-
   private applyDisplace(mover: Character, target: Character): void {
     const { dc, dr } = computeDisplaceDir(mover, target);
     const dest = { col: target.coord.col + dc, row: target.coord.row + dr };
@@ -610,6 +486,7 @@ export class Game {
     this.inputManager.dispose();
     this.selectionSystem.dispose();
     this.movementSystem.dispose();
+    this.rangeSystem.dispose();
     this.gameClient?.close();
     this.turnCounter.remove();
     this.turnIndicator.remove();
