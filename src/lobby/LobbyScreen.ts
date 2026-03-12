@@ -1,7 +1,7 @@
 import type { GameMode } from '../core/GameMode';
 import type { ServerMessage } from '../net/protocol';
 import { API_BASE, WS_BASE } from '../config/env';
-import { LobbyMusic } from '../audio/LobbyMusic';
+import { MusicPlayer, MUSIC_FILES } from '../audio/MusicPlayer';
 import { SelectionScreen } from './SelectionScreen';
 import { characters as allCharacters, teamSpawnCoords } from '../config/gameConfig';
 import type { CharacterConfig } from '../types/characters';
@@ -12,7 +12,7 @@ export class LobbyScreen {
   private container: HTMLDivElement;
   private phase: LobbyPhase = 'MENU';
   private ws: WebSocket | null = null;
-  private music: LobbyMusic;
+  private music = new MusicPlayer();
   private selectionScreen: SelectionScreen | null = null;
   private pvpRoster: CharacterConfig[] = [];
 
@@ -25,8 +25,7 @@ export class LobbyScreen {
     });
     document.body.appendChild(this.container);
 
-    this.music = new LobbyMusic();
-    this.music.start();
+    this.music.play(MUSIC_FILES.LOBBY);
 
     this.render();
   }
@@ -137,6 +136,7 @@ export class LobbyScreen {
     this.phase = 'SELECTING';
     this.render(); // clears container
     this.container.style.display = 'none'; // hide lobby container
+    this.music.stop();
 
     this.selectionScreen = new SelectionScreen(
       null,
@@ -248,6 +248,7 @@ export class LobbyScreen {
     this.phase = 'SELECTING';
     this.render();
     this.container.style.display = 'none';
+    this.music.stop();
 
     this.selectionScreen = new SelectionScreen(
       localTeam,

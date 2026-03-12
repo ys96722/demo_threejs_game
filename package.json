@@ -9,7 +9,8 @@
     "test": "vitest",
     "screenshot": "node scripts/screenshot.mjs",
     "create-pr": "node scripts/create-pr.mjs",
-    "server": "cd server && uvicorn main:app --reload --port 8000"
+    "server": "cd server && uvicorn main:app --reload --port 8000",
+    "sync": "git fetch --prune --all && git branch | grep -v \"main\" | xargs git branch -d"
   },
   "dependencies": {
     "three": "^0.171.0"
