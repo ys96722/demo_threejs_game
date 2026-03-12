@@ -17,11 +17,11 @@ export class SelectionScreen {
   private selectedChampionByTeam: Record<number, number | null> = { 1: null, 2: null };
 
   /**
-   * @param localTeam  1 or 2 in PvP (pick only this team's champion); null for solo
-   * @param roster     Flat array of all available characters
-   * @param ws         WebSocket for PvP; null for solo
-   * @param onReady    Called with selections (team→playerIndex) and board choice
-   */
+    * @param localTeam  1 or 2 in PvP (pick only this team's champion); null for solo
+    * @param roster     Flat array of all available characters
+    * @param ws         WebSocket for PvP; null for solo
+    * @param onReady    Called with selections (team→playerIndex) and board choice
+    */
   constructor(
     private localTeam: number | null,
     private roster: CharacterConfig[],
@@ -29,12 +29,7 @@ export class SelectionScreen {
     private onReady: (selections: Record<number, number>, board: BoardType) => void,
   ) {
     this.container = document.createElement('div');
-    Object.assign(this.container.style, {
-      position: 'fixed', inset: '0', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      background: 'var(--theme-lobby-bg)', fontFamily: 'sans-serif', zIndex: '500',
-      gap: '0',
-    });
+    this.container.className = 'at-screen';
     document.body.appendChild(this.container);
     this.music.play(MUSIC_FILES.SELECTION);
 
@@ -68,58 +63,43 @@ export class SelectionScreen {
     // Title
     const title = document.createElement('h2');
     title.textContent = 'Choose Your Champion';
-    Object.assign(title.style, {
-      color: 'var(--theme-text)', fontSize: '28px', margin: '0 0 8px',
-    });
+    title.className = 'at-selection-title';
     this.container.appendChild(title);
 
     // Subtitle
     const subtitle = document.createElement('p');
     subtitle.textContent = this.localTeam !== null ? `You (Team ${team})` : `Team ${team}`;
-    Object.assign(subtitle.style, {
-      color: 'var(--theme-accent)', fontSize: '16px', margin: '0 0 24px', fontWeight: 'bold',
-    });
+    subtitle.className = 'at-selection-subtitle';
     this.container.appendChild(subtitle);
 
     // Cards row
     const row = document.createElement('div');
-    Object.assign(row.style, { display: 'flex', gap: '20px', marginBottom: '24px' });
+    row.className = 'at-card-row';
     this.container.appendChild(row);
 
     const cards: HTMLDivElement[] = [];
 
     roster.forEach((char, i) => {
-      const card = this.makeChampionCard(char);
+      const card = this.makeChampionCard(char, i);
       cards.push(card);
 
       const alreadyPicked = Object.values(this.selectedChampionByTeam).includes(char.playerIndex);
       if (alreadyPicked) {
-        card.style.opacity = '0.35';
-        card.style.cursor = 'not-allowed';
+        card.classList.add('at-champion-card--disabled');
         row.appendChild(card);
         return;
       }
 
       card.addEventListener('mouseenter', () => {
         playHoverSfx();
-        card.style.borderColor = 'var(--theme-accent)';
-      });
-      card.addEventListener('mouseleave', () => {
-        if (selectedIdx !== i) card.style.borderColor = 'transparent';
       });
       card.addEventListener('click', () => {
         selectedIdx = i;
         for (let j = 0; j < cards.length; j++) {
           if (Object.values(this.selectedChampionByTeam).includes(roster[j]?.playerIndex)) continue;
-          cards[j].style.borderColor = j === i ? 'var(--theme-accent)' : 'transparent';
-          cards[j].style.boxShadow = j === i ? '0 0 12px var(--theme-accent)' : 'none';
+          cards[j].classList.toggle('at-champion-card--selected', j === i);
         }
         lockBtn.disabled = false;
-        Object.assign(lockBtn.style, {
-          background: 'var(--theme-btn-bg)',
-          color: 'var(--theme-btn-color)',
-          cursor: 'pointer',
-        });
       });
       row.appendChild(card);
     });
@@ -128,11 +108,7 @@ export class SelectionScreen {
     const lockBtn = document.createElement('button');
     lockBtn.textContent = 'Lock In';
     lockBtn.disabled = true;
-    Object.assign(lockBtn.style, {
-      padding: '12px 40px', borderRadius: '6px', border: 'none',
-      background: '#333', color: '#666', fontSize: '16px',
-      cursor: 'default', minWidth: '200px',
-    });
+    lockBtn.className = 'at-btn';
     lockBtn.addEventListener('click', () => {
       if (selectedIdx === null) return;
       playLockInSfx();
@@ -170,34 +146,25 @@ export class SelectionScreen {
   // DOM helpers
   // ---------------------------------------------------------------------------
 
-  private makeChampionCard(char: CharacterConfig): HTMLDivElement {
+  private makeChampionCard(char: CharacterConfig, cardIndex: number): HTMLDivElement {
     const card = document.createElement('div');
-    Object.assign(card.style, {
-      background: 'var(--theme-panel-bg)',
-      border: '2px solid transparent',
-      borderRadius: '10px',
-      padding: '16px',
-      width: '160px',
-      textAlign: 'center',
-      cursor: 'pointer',
-      transition: 'border-color 0.15s, box-shadow 0.15s',
-      color: 'var(--theme-text)',
-      userSelect: 'none',
-    });
+    card.className = 'at-champion-card';
+    card.style.animationDelay = `${cardIndex * 0.08}s`;
 
+    const imageArea = document.createElement('div');
+    imageArea.className = 'at-champion-card__image-area';
     const img = document.createElement('img');
     img.src = char.spritePath;
-    Object.assign(img.style, {
-      width: '80px', height: '80px',
-      imageRendering: 'pixelated',
-      display: 'block', margin: '0 auto 10px',
-    });
-    card.appendChild(img);
+    imageArea.appendChild(img);
+    card.appendChild(imageArea);
+
+    const infoArea = document.createElement('div');
+    infoArea.className = 'at-champion-card__info-area';
 
     const name = document.createElement('p');
     name.textContent = char.name;
-    Object.assign(name.style, { margin: '0 0 6px', fontWeight: 'bold', fontSize: '15px' });
-    card.appendChild(name);
+    name.className = 'at-champion-card__name';
+    infoArea.appendChild(name);
 
     const stats = [
       `HP ${char.hp}`,
@@ -208,8 +175,8 @@ export class SelectionScreen {
     ];
     const statsEl = document.createElement('p');
     statsEl.textContent = stats.join(' · ');
-    Object.assign(statsEl.style, { margin: '0 0 6px', fontSize: '11px', opacity: '0.75' });
-    card.appendChild(statsEl);
+    statsEl.className = 'at-champion-card__stats';
+    infoArea.appendChild(statsEl);
 
     if (char.skills.length > 0) {
       const skillEl = document.createElement('p');
@@ -217,12 +184,11 @@ export class SelectionScreen {
         ? char.skills[0].name.slice(0, 24) + '…'
         : char.skills[0].name;
       skillEl.textContent = `✦ ${skillName}`;
-      Object.assign(skillEl.style, {
-        margin: '0', fontSize: '11px', color: 'var(--theme-accent)', fontStyle: 'italic',
-      });
-      card.appendChild(skillEl);
+      skillEl.className = 'at-champion-card__skill';
+      infoArea.appendChild(skillEl);
     }
 
+    card.appendChild(infoArea);
     return card;
   }
 }

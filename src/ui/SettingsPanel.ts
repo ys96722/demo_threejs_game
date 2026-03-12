@@ -18,24 +18,7 @@ export class SettingsPanel {
     this.gear = document.createElement('button');
     this.gear.textContent = '⚙';
     this.gear.title = 'Settings';
-    Object.assign(this.gear.style, {
-      position: 'fixed',
-      top: '16px',
-      right: '16px',
-      zIndex: '610',
-      width: '36px',
-      height: '36px',
-      borderRadius: '50%',
-      border: '1px solid var(--theme-input-border)',
-      background: 'var(--theme-panel-bg)',
-      color: 'var(--theme-text)',
-      fontSize: '18px',
-      cursor: 'pointer',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '0',
-    });
+    this.gear.className = 'at-settings-gear';
     this.gear.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggle();
@@ -43,20 +26,8 @@ export class SettingsPanel {
 
     // ── Dropdown panel ───────────────────────────────────────────────────────
     this.panel = document.createElement('div');
-    Object.assign(this.panel.style, {
-      position: 'fixed',
-      top: '60px',
-      right: '16px',
-      zIndex: '610',
-      background: 'var(--theme-panel-bg)',
-      border: '1px solid var(--theme-input-border)',
-      borderRadius: '10px',
-      padding: '14px 16px',
-      display: 'none',
-      flexDirection: 'column',
-      gap: '14px',
-      minWidth: '220px',
-    });
+    this.panel.className = 'at-settings-panel';
+    this.panel.style.display = 'none';
 
     this.panel.appendChild(this.buildVolumeRow());
     this.panel.appendChild(this.buildThemeRow());
@@ -77,18 +48,20 @@ export class SettingsPanel {
 
   private buildVolumeRow(): HTMLDivElement {
     const row = document.createElement('div');
-    Object.assign(row.style, { display: 'flex', alignItems: 'center', gap: '10px' });
+    row.className = 'at-settings-row';
 
     const label = document.createElement('span');
     label.textContent = 'Volume';
-    Object.assign(label.style, { color: 'var(--theme-text)', fontSize: '13px', whiteSpace: 'nowrap' });
+    label.className = 'at-settings-label';
 
     const slider = document.createElement('input');
     slider.type = 'range';
     slider.min = '0';
     slider.max = '100';
     slider.value = String(Math.round(getMasterVolume() * 100));
-    Object.assign(slider.style, { flex: '1', cursor: 'pointer', accentColor: 'var(--theme-accent)' });
+    slider.style.flex = '1';
+    slider.style.cursor = 'pointer';
+    slider.style.accentColor = 'var(--theme-accent)';
 
     slider.addEventListener('input', () => {
       setMasterVolume(Number(slider.value) / 100);
@@ -101,11 +74,11 @@ export class SettingsPanel {
 
   private buildThemeRow(): HTMLDivElement {
     const row = document.createElement('div');
-    Object.assign(row.style, { display: 'flex', alignItems: 'center', gap: '10px' });
+    row.className = 'at-settings-row';
 
     const label = document.createElement('span');
     label.textContent = 'Theme';
-    Object.assign(label.style, { color: 'var(--theme-text)', fontSize: '13px', whiteSpace: 'nowrap' });
+    label.className = 'at-settings-label';
 
     const swatches = document.createElement('div');
     Object.assign(swatches.style, { display: 'flex', gap: '8px' });
