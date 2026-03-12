@@ -28,14 +28,17 @@ TypeScript type-checking (`tsc --noEmit`) is the primary build correctness check
 
 **Systems** (`src/systems/`) subscribe to bus events in their constructor and must call `bus.off(...)` in their `dispose()` method. Systems receive dependencies (grid, callbacks) injected from `Game` — they do not import `Game` directly.
 
-- `SelectionSystem` — manages character selection state, action panel UI, attack/skill targeting modes, range preview on button hover, and Web Audio API sounds (no audio files; sounds are synthesized). Emits intent events only (`ATTACK_INTENT`, `SKILL_HIT`, `SPEND_ACTION_INTENT`); `Game.ts` applies all state changes.
+- `SelectionSystem` — manages character selection state, action panel UI, attack/skill targeting modes, range preview on button hover. Audio SFX calls delegate to `src/audio/GameSfx.ts`. Emits intent events only (`ATTACK_INTENT`, `SKILL_HIT`, `SPEND_ACTION_INTENT`); `Game.ts` applies all state changes.
 - `MovementSystem` — validates movement on tile click and emits `MOVE_INTENT`; does not mutate character state.
+- `RangeVisualizationSystem` — owns all tile range highlighting (reachable, attack range, hover). Subscribes to `CHARACTER_SELECTED`, `CHARACTER_DESELECTED`, `ATTACK_TARGETING_START/CANCELLED`, `SKILL_TARGETING_START/CANCELLED`, `RANGE_PREVIEW_START/END`, `CHARACTER_MOVE_START`, `TILE_HOVER_ENTER/EXIT`.
 
 **Entities** (`src/entities/`) are Three.js objects. `Character` owns a `THREE.Group` containing: a character `Sprite`, a selection glow `Sprite` (same texture, additive blending, HDR color for bloom, hidden until selected), a health bar sprite, and a token indicator sprite. Characters are not aware of the grid or bus directly.
 
 Key `Character` methods: `setSelected(bool)` — shows/hides the bloom glow. `setTokensVisible(bool)` — tokens are only shown for the active player's characters. `setHp(value)` — clamps and redraws health bar. `updateTokenDisplay()` — redraws move/action token dots.
 
 **Skills** — defined as `SkillDef { name: string; range: number; targetType: 'enemy' | 'ally' | 'any' }` in `src/types/characters.ts`. Characters carry a `skills: SkillDef[]` array in their config. `SelectionSystem` shows skill buttons by name in the action panel (rebuilt per character in `showPanel`). Effect logic lives in `Game.ts` dispatched by `skillName` in the `SKILL_HIT` handler.
+
+Skill names are constants in `src/types/skills.ts` (`SKILL_NAMES`). Adding a new skill requires: (1) an entry in `SKILL_NAMES`, (2) an `else if` branch in the `SKILL_HIT` handler and both skill callbacks in `Game.ts`, (3) a skill def in `gameConfig.ts` using `SKILL_NAMES`, and (4) a branch in `apply_skill()` in `server/game_state.py`.
 
 **World** (`src/world/`) — `Grid` creates a 10×10 array of `Tile` objects. `Tile.gridToWorld()` converts `GridCoord → THREE.Vector3`: `x = (col - (cols-1)/2) * step`, `z = (row - (rows-1)/2) * step` where `step = tileSize + tileGap = 1.04`. Each tile mesh stores `mesh.userData['tile'] = this` for O(1) raycaster lookup. `GridVisuals` manages shared `MeshToonMaterial` instances per `TileState`.
 
