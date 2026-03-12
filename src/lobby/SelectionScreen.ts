@@ -1,56 +1,9 @@
 import type { BoardType } from '../core/GameMode';
 import type { CharacterConfig } from '../types/characters';
 import type { ClientMessage } from '../net/protocol';
+import { playHoverSfx, playLockInSfx } from '../audio/GameSfx';
 
 type SelectionPhase = 'CHAMPION_T1' | 'CHAMPION_T2';
-
-// ---------------------------------------------------------------------------
-// Sound helpers (inline, no audio files)
-// ---------------------------------------------------------------------------
-
-function playHoverSfx(): void {
-  try {
-    const ctx = new AudioContext();
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.12, ctx.currentTime);
-    gain.connect(ctx.destination);
-
-    const freqs = [440, 554];
-    freqs.forEach((f, i) => {
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.value = f;
-      osc.connect(gain);
-      const t = ctx.currentTime + i * 0.06;
-      osc.start(t);
-      osc.stop(t + 0.06);
-    });
-
-    setTimeout(() => ctx.close(), 500);
-  } catch { /* AudioContext may be blocked */ }
-}
-
-function playLockInSfx(): void {
-  try {
-    const ctx = new AudioContext();
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain.connect(ctx.destination);
-
-    const freqs = [523, 659, 784];
-    freqs.forEach((f, i) => {
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.value = f;
-      osc.connect(gain);
-      const t = ctx.currentTime + i * 0.1;
-      osc.start(t);
-      osc.stop(t + 0.12);
-    });
-
-    setTimeout(() => ctx.close(), 800);
-  } catch { /* AudioContext may be blocked */ }
-}
 
 // ---------------------------------------------------------------------------
 // SelectionScreen

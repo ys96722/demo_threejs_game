@@ -4,14 +4,13 @@ import type { Character } from '../entities/Character';
 import type { EffectPreview, SkillDef } from '../types/characters';
 import type { GridCoord } from '../types/grid';
 import { computeAttackDamage } from '../logic/combat';
-import { gameConfig } from '../config/gameConfig';
+import { playSelectSound, playInvalidSound } from '../audio/GameSfx';
 
 export class SelectionSystem {
   private selectedPlayerIndex: number | null = null;
   private isTargetingAttack: boolean = false;
   private isTargetingSkill: boolean = false;
   private activeSkill: SkillDef | null = null;
-  private audioCtx: AudioContext | null = null;
   private actionPanel: HTMLDivElement;
   private previewTargetIndex: number | null = null;
 
@@ -181,7 +180,7 @@ export class SelectionSystem {
     // Clicking a non-reachable tile while movement is available → play deny sound, stay selected
     if (this.selectedPlayerIndex !== null && !this.isReachable(coord)) {
       const char = this.getCharacter(this.selectedPlayerIndex);
-      if (char && char.moveTokens > 0) this.playInvalidSound();
+      if (char && char.moveTokens > 0) playInvalidSound();
     }
   };
 
@@ -254,41 +253,6 @@ export class SelectionSystem {
     this.selectedPlayerIndex = null;
   };
 
-  private playSelectSound(): void {
-    if (!this.audioCtx) this.audioCtx = new AudioContext();
-    const ctx = this.audioCtx;
-    const playTone = (freq: number, startTime: number, duration: number) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, startTime);
-      gain.gain.setValueAtTime(0.18, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-      osc.start(startTime);
-      osc.stop(startTime + duration);
-    };
-    playTone(523, ctx.currentTime, 0.14);        // C5
-    playTone(659, ctx.currentTime + 0.09, 0.18); // E5
-  }
-
-  private playInvalidSound(): void {
-    if (!this.audioCtx) this.audioCtx = new AudioContext();
-    const ctx = this.audioCtx;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(300, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.12);
-    gain.gain.setValueAtTime(gameConfig.audio.gain, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.12);
-  }
-
   private handleAttackTargetClick(coord: GridCoord): void {
     if (this.selectedPlayerIndex === null) return;
     const attacker = this.getCharacter(this.selectedPlayerIndex);
@@ -313,7 +277,7 @@ export class SelectionSystem {
       bus.emit(EVENTS.ATTACK_INTENT, { attackerIndex: attacker.playerIndex, targetCoord: coord });
       bus.emit(EVENTS.CHARACTER_DESELECTED, { playerIndex });
     } else {
-      this.playInvalidSound();
+      playInvalidSound();
     }
   }
 
@@ -356,7 +320,7 @@ export class SelectionSystem {
       bus.emit(EVENTS.SKILL_HIT, { casterIndex: playerIndex, skillName: skill.name, targetCoord: coord });
       bus.emit(EVENTS.CHARACTER_DESELECTED, { playerIndex });
     } else {
-      this.playInvalidSound();
+      playInvalidSound();
     }
   }
 
@@ -381,7 +345,7 @@ export class SelectionSystem {
   };
 
   private handleCharacterSelected = ({ playerIndex }: { playerIndex: number }): void => {
-    this.playSelectSound();
+    playSelectSound();
     this.showPanel(playerIndex);
   };
 
@@ -447,7 +411,6 @@ export class SelectionSystem {
     bus.off(EVENTS.CHARACTER_DESELECTED, this.handleCharacterDeselected);
     bus.off(EVENTS.TURN_CHANGED, this.handleTurnChanged);
     bus.off(EVENTS.CANVAS_CLICKED_EMPTY, this.handleCanvasClickedEmpty);
-    this.audioCtx?.close();
     window.removeEventListener('keydown', this.handleKeyDown);
     this.actionPanel.remove();
   }
