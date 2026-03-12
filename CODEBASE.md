@@ -22,7 +22,8 @@ src/
 ├── types/
 │   ├── grid.ts                    # GridCoord, TileState enum
 │   ├── events.ts                  # EVENTS const, EventPayloads map
-│   └── characters.ts              # CharacterConfig, SkillDef, EffectPreview
+│   ├── characters.ts              # CharacterConfig, SkillDef, EffectPreview
+│   └── skills.ts                  # SKILL_NAMES const (single source of truth for skill name strings)
 │
 ├── core/
 │   ├── EventBus.ts                # Typed pub/sub singleton (`bus`)
@@ -43,6 +44,16 @@ src/
 │   ├── Character.ts               # THREE.Group: sprite, glow, health bar, token indicator
 │   └── CharacterAnimator.ts       # Parabolic hop animation (easeInOutQuad)
 │
+├── audio/
+│   ├── MusicPlayer.ts             # HTMLAudio-based player; module-level masterVolume shared across all instances
+│   └── GameSfx.ts                 # Web Audio API SFX (hover, lock-in); no audio files
+│
+├── theme/
+│   └── themes.ts                  # Theme definitions (VOID/EMBER/SPECTER): CSS vars, scene colors, tile colors
+│
+├── ui/
+│   └── SettingsPanel.ts           # Gear icon + dropdown: volume slider (persisted) + theme swatches
+│
 ├── input/
 │   └── InputManager.ts            # mousemove/click → NDC → Raycaster → bus events
 │
@@ -51,7 +62,8 @@ src/
 │   └── MovementSystem.ts          # Validates movement on tile click; emits MOVE_INTENT only
 │
 ├── lobby/
-│   └── LobbyScreen.ts             # DOM state machine: MENU → PVP_MENU → WAITING → onGameReady(mode)
+│   ├── LobbyScreen.ts             # DOM state machine: MENU → PVP_MENU → WAITING → onGameReady(mode)
+│   └── SelectionScreen.ts         # Champion draft UI; plays selection music; emits ready when both teams lock in
 │
 ├── net/
 │   ├── GameClient.ts              # Owns WebSocket; translates server messages to bus events + Character calls
@@ -148,7 +160,7 @@ Systems subscribe to bus events in their constructor and **must** call `bus.off(
 - Manages which character is selected and what targeting mode is active (normal / attack / skill)
 - Rebuilds the HTML action panel per selected character (`showPanel()`)
 - Highlights reachable tiles, attack range tiles, and skill range tiles on hover
-- Synthesizes Web Audio API sounds (no audio files)
+- Synthesizes Web Audio API sounds via `GameSfx.ts` (hover, lock-in)
 - Emits **intent events only** — never mutates character state:
   - `SKILL_HIT { casterIndex, skillName, targetCoord }` after validating skill range
   - `SPEND_ACTION_INTENT { playerIndex }` when Transcend/Hold is clicked
