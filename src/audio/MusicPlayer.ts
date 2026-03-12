@@ -4,6 +4,7 @@ export const MUSIC_FILES = {
   SELECTION: `${import.meta.env.BASE_URL}music/Celestial Vow.wav`,
   GAME:      `${import.meta.env.BASE_URL}music/Te amo 4.wav`,
   // Note: Binary Dawn Tactics.wav for actual. Update later
+  STORE:     `${import.meta.env.BASE_URL}music/Store 6.wav`,
 };
 // ────────────────────────────────────────────────────────────────────────────
 

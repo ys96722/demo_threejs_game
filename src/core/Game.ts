@@ -57,30 +57,6 @@ export class Game {
   private charKey(team: number, idx: number): string { return `${team}_${idx}`; }
 
   constructor(private mode: GameMode = { kind: 'solo', selections: { 1: 1, 2: 2 }, board: 'tactical' }) {
-    // Inject chat float animation once
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes chat-float {
-        0%   { opacity: 0;   transform: translateY(0); }
-        15%  { opacity: 1;   transform: translateY(-30px); }
-        75%  { opacity: 1;   transform: translateY(-150px); }
-        100% { opacity: 0;   transform: translateY(-200px); }
-      }
-      .chat-message {
-        position: fixed;
-        left: 24px;
-        bottom: 64px;
-        color: #ffffff;
-        font-family: sans-serif;
-        font-size: 14px;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-        pointer-events: none;
-        z-index: 150;
-        animation: chat-float 5s ease-in-out forwards;
-      }
-    `;
-    document.head.appendChild(style);
-
     this.renderer = new Renderer();
     this.cameraController = new CameraController();
 
@@ -347,26 +323,23 @@ export class Game {
 
     bus.on(EVENTS.GAME_OVER, ({ winnerTeam }) => {
       const overlay = document.createElement('div');
-      Object.assign(overlay.style, {
-        position: 'fixed', inset: '0', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0,0,0,0.75)', zIndex: '200', color: '#fff', fontFamily: 'sans-serif',
-      });
+      overlay.className = 'at-gameover-overlay';
       const msg = document.createElement('h1');
       msg.textContent = `Team ${winnerTeam} wins!`;
-      Object.assign(msg.style, { fontSize: '48px', margin: '0 0 24px' });
+      msg.className = 'at-gameover-title';
       overlay.appendChild(msg);
+      const returnBtn = document.createElement('button');
+      returnBtn.textContent = 'Return to Menu';
+      returnBtn.className = 'at-btn at-gameover-btn';
+      returnBtn.addEventListener('click', () => location.reload());
+      overlay.appendChild(returnBtn);
       document.body.appendChild(overlay);
     });
 
     bus.on(EVENTS.OPPONENT_DISCONNECTED, () => {
       const banner = document.createElement('div');
       banner.textContent = 'Opponent disconnected.';
-      Object.assign(banner.style, {
-        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-        background: 'rgba(0,0,0,0.85)', color: '#fff', padding: '24px 40px',
-        borderRadius: '10px', fontFamily: 'sans-serif', fontSize: '20px', zIndex: '200',
-      });
+      banner.className = 'at-disconnect-banner';
       document.body.appendChild(banner);
     });
 
@@ -386,41 +359,19 @@ export class Game {
     this.composer.addPass(new OutputPass());
 
     // Turn counter + indicator DOM overlays
-    const sharedStyle = {
-      position: 'fixed',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      color: '#ffffff',
-      background: 'rgba(0,0,0,0.55)',
-      padding: '6px 18px',
-      borderRadius: '6px',
-      fontFamily: 'sans-serif',
-      pointerEvents: 'none',
-      zIndex: '100',
-    };
-
     this.turnCounter = document.createElement('div');
     this.turnCounter.id = 'turn-counter';
     this.turnCounter.textContent = `Current Turn: ${this.turnManager.turnCount}`;
-    Object.assign(this.turnCounter.style, { ...sharedStyle, top: '16px', fontSize: '14px' });
     document.body.appendChild(this.turnCounter);
 
     this.turnIndicator = document.createElement('div');
     this.turnIndicator.id = 'turn-indicator';
     this.turnIndicator.textContent = `Player ${this.activeTeam}'s Turn`;
-    Object.assign(this.turnIndicator.style, { ...sharedStyle, top: '52px', fontSize: '16px' });
     document.body.appendChild(this.turnIndicator);
 
     // Chat input
     this.chatInput = document.createElement('input');
-    Object.assign(this.chatInput.style, {
-      position: 'fixed', left: '24px', bottom: '24px',
-      width: '220px', padding: '6px 10px',
-      background: 'rgba(0,0,0,0.55)', color: '#fff',
-      border: '1px solid rgba(255,255,255,0.25)', borderRadius: '4px',
-      fontFamily: 'sans-serif', fontSize: '13px',
-      outline: 'none', zIndex: '150',
-    });
+    this.chatInput.className = 'at-chat-input';
     this.chatInput.placeholder = 'Press Enter to chat…';
     this.chatInput.addEventListener('keydown', this.handleChatKeyDown);
     document.body.appendChild(this.chatInput);

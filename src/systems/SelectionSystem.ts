@@ -48,15 +48,7 @@ export class SelectionSystem {
   private makeButton(label: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.textContent = label;
-    Object.assign(btn.style, {
-      padding: '8px 12px',
-      borderRadius: '4px',
-      border: 'none',
-      background: 'var(--theme-btn-bg)',
-      color: 'var(--theme-btn-color)',
-      fontSize: '13px',
-      cursor: 'pointer',
-    });
+    btn.className = 'at-btn-sm';
     btn.addEventListener('click', onClick);
     return btn;
   }
@@ -64,31 +56,10 @@ export class SelectionSystem {
   private createPanel(): HTMLDivElement {
     const panel = document.createElement('div');
     panel.id = 'action-panel';
-    Object.assign(panel.style, {
-      position: 'fixed',
-      right: '24px',
-      top: '50%',
-      transform: 'translateY(-50%)',
-      display: 'none',
-      flexDirection: 'column',
-      gap: '8px',
-      background: 'var(--theme-panel-bg)',
-      padding: '16px',
-      borderRadius: '8px',
-      fontFamily: 'sans-serif',
-      zIndex: '100',
-      minWidth: '140px',
-    });
+    panel.style.display = 'none';
 
     const title = document.createElement('p');
     title.id = 'action-panel-title';
-    Object.assign(title.style, {
-      color: 'var(--theme-text)',
-      margin: '0 0 8px 0',
-      fontWeight: 'bold',
-      fontSize: '14px',
-      textAlign: 'center',
-    });
     panel.appendChild(title);
 
     // Basic Attack — static button with range preview on hover
@@ -109,7 +80,7 @@ export class SelectionSystem {
     // Skill buttons slot — populated dynamically in showPanel
     const skillsSlot = document.createElement('div');
     skillsSlot.id = 'action-panel-skills';
-    Object.assign(skillsSlot.style, { display: 'contents' });
+    skillsSlot.style.display = 'contents';
     panel.appendChild(skillsSlot);
 
     panel.appendChild(this.makeButton('Transcend', () => this.handleActionClick()));

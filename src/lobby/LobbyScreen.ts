@@ -3,10 +3,11 @@ import type { ServerMessage } from '../net/protocol';
 import { API_BASE, WS_BASE } from '../config/env';
 import { MusicPlayer, MUSIC_FILES } from '../audio/MusicPlayer';
 import { SelectionScreen } from './SelectionScreen';
+import { StoreScreen } from './StoreScreen';
 import { characters as allCharacters, teamSpawnCoords } from '../config/gameConfig';
 import type { CharacterConfig } from '../types/characters';
 
-type LobbyPhase = 'MENU' | 'PVP_MENU' | 'JOIN_INPUT' | 'WAITING' | 'SELECTING';
+type LobbyPhase = 'MENU' | 'PVP_MENU' | 'JOIN_INPUT' | 'WAITING' | 'SELECTING' | 'STORE';
 
 export class LobbyScreen {
   private container: HTMLDivElement;
@@ -14,15 +15,12 @@ export class LobbyScreen {
   private ws: WebSocket | null = null;
   private music = new MusicPlayer();
   private selectionScreen: SelectionScreen | null = null;
+  private storeScreen: StoreScreen | null = null;
   private pvpRoster: CharacterConfig[] = [];
 
   constructor(private onGameReady: (mode: GameMode) => void) {
     this.container = document.createElement('div');
-    Object.assign(this.container.style, {
-      position: 'fixed', inset: '0', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      background: 'var(--theme-lobby-bg)', fontFamily: 'sans-serif', zIndex: '500',
-    });
+    this.container.className = 'at-screen';
     document.body.appendChild(this.container);
 
     this.music.play(MUSIC_FILES.LOBBY);
@@ -33,6 +31,7 @@ export class LobbyScreen {
   dispose(): void {
     this.music.dispose();
     this.selectionScreen?.dispose();
+    this.storeScreen?.dispose();
     this.container.remove();
   }
 
@@ -48,30 +47,32 @@ export class LobbyScreen {
       case 'JOIN_INPUT': return this.renderJoinInput();
       case 'WAITING':    return this.renderWaiting('Waiting for opponent…');
       case 'SELECTING':  return; // SelectionScreen is mounted separately
+      case 'STORE':      return; // StoreScreen is mounted separately
     }
   }
 
   private renderMenu(): void {
-    this.title('SRPG Demo');
-    this.btn('Quick Test (Solo)', () => this.startSoloSelection());
+    this.mainTitle('SRPG Demo');
+    this.btn('Quick Test (Solo)', () => this.startSoloSelection(), false, 0);
     this.btn('PvP', () => {
       this.phase = 'PVP_MENU';
       this.render();
-    });
-    this.btn('Campaign', () => this.toast('Campaign — coming soon!'), true);
+    }, false, 1);
+    this.btn('Campaign', () => this.toast('Campaign — coming soon!'), true, 2);
+    this.btn('Store', () => this.startStore(), false, 3);
   }
 
   private renderPvpMenu(): void {
     this.title('PvP');
-    this.btn('Create Lobby', () => this.handleCreateLobby());
+    this.btn('Create Lobby', () => this.handleCreateLobby(), false, 0);
     this.btn('Join Lobby', () => {
       this.phase = 'JOIN_INPUT';
       this.render();
-    });
+    }, false, 1);
     this.btn('← Back', () => {
       this.phase = 'MENU';
       this.render();
-    });
+    }, false, 2);
   }
 
   private renderJoinInput(): void {
@@ -79,15 +80,11 @@ export class LobbyScreen {
 
     const input = document.createElement('input');
     input.placeholder = 'Enter lobby code';
-    Object.assign(input.style, {
-      padding: '10px 16px', borderRadius: '6px', border: '1px solid var(--theme-input-border)',
-      background: 'var(--theme-input-bg)', color: 'var(--theme-text)', fontSize: '18px', textAlign: 'center',
-      letterSpacing: '4px', textTransform: 'uppercase', marginBottom: '12px', width: '180px',
-    });
+    input.className = 'at-input';
     this.container.appendChild(input);
 
     const errDiv = document.createElement('div');
-    Object.assign(errDiv.style, { color: '#f87171', fontSize: '13px', marginBottom: '8px', minHeight: '18px' });
+    errDiv.className = 'at-error';
     this.container.appendChild(errDiv);
 
     this.btn('Join', async () => {
@@ -105,11 +102,11 @@ export class LobbyScreen {
       } catch {
         errDiv.textContent = 'Could not reach server.';
       }
-    });
+    }, false, 0);
     this.btn('← Back', () => {
       this.phase = 'PVP_MENU';
       this.render();
-    });
+    }, false, 1);
 
     input.focus();
   }
@@ -117,7 +114,7 @@ export class LobbyScreen {
   private renderWaiting(msg: string): void {
     const p = document.createElement('p');
     p.textContent = msg;
-    Object.assign(p.style, { color: '#aaa', fontSize: '18px' });
+    p.className = 'at-status-text';
     this.container.appendChild(p);
 
     this.btn('← Cancel', () => {
@@ -125,7 +122,7 @@ export class LobbyScreen {
       this.ws = null;
       this.phase = 'PVP_MENU';
       this.render();
-    });
+    }, false, 0);
   }
 
   // ---------------------------------------------------------------------------
@@ -150,6 +147,26 @@ export class LobbyScreen {
   }
 
   // ---------------------------------------------------------------------------
+  // Store flow
+  // ---------------------------------------------------------------------------
+
+  private startStore(): void {
+    this.phase = 'STORE';
+    this.render(); // clears container
+    this.container.style.display = 'none';
+    this.music.stop();
+
+    this.storeScreen = new StoreScreen(() => {
+      this.storeScreen?.dispose();
+      this.storeScreen = null;
+      this.container.style.display = 'flex';
+      this.phase = 'MENU';
+      this.music.play(MUSIC_FILES.LOBBY);
+      this.render();
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Lobby actions
   // ---------------------------------------------------------------------------
 
@@ -168,19 +185,13 @@ export class LobbyScreen {
 
   private showCode(code: string): void {
     const codeBox = document.createElement('div');
-    Object.assign(codeBox.style, {
-      marginTop: '24px', padding: '16px 32px', background: '#111',
-      border: '1px solid #333', borderRadius: '8px', textAlign: 'center',
-    });
+    codeBox.className = 'at-code-box';
     const label = document.createElement('p');
     label.textContent = 'Share this code with your opponent:';
-    Object.assign(label.style, { color: '#aaa', fontSize: '13px', margin: '0 0 8px' });
+    label.className = 'at-code-label';
     const codeEl = document.createElement('p');
     codeEl.textContent = code;
-    Object.assign(codeEl.style, {
-      color: '#fff', fontSize: '32px', fontWeight: 'bold',
-      letterSpacing: '6px', margin: '0',
-    });
+    codeEl.className = 'at-code-value';
     codeBox.appendChild(label);
     codeBox.appendChild(codeEl);
     this.container.appendChild(codeBox);
@@ -270,23 +281,26 @@ export class LobbyScreen {
   // DOM helpers
   // ---------------------------------------------------------------------------
 
-  private title(text: string): void {
+  private mainTitle(text: string): void {
     const h1 = document.createElement('h1');
     h1.textContent = text;
-    Object.assign(h1.style, { color: 'var(--theme-text)', fontSize: '36px', marginBottom: '32px' });
+    h1.className = 'at-lobby-title';
     this.container.appendChild(h1);
   }
 
-  private btn(label: string, onClick: () => void, disabled = false): HTMLButtonElement {
+  private title(text: string): void {
+    const h1 = document.createElement('h1');
+    h1.textContent = text;
+    h1.className = 'at-section-title';
+    this.container.appendChild(h1);
+  }
+
+  private btn(label: string, onClick: () => void, disabled = false, staggerIndex = 0): HTMLButtonElement {
     const b = document.createElement('button');
     b.textContent = label;
     b.disabled = disabled;
-    Object.assign(b.style, {
-      padding: '12px 32px', borderRadius: '6px', border: 'none',
-      background: disabled ? '#333' : 'var(--theme-btn-bg)',
-      color: disabled ? '#666' : 'var(--theme-btn-color)', fontSize: '16px',
-      cursor: disabled ? 'default' : 'pointer', marginBottom: '10px', minWidth: '200px',
-    });
+    b.className = 'at-btn at-btn-stagger';
+    b.style.animationDelay = `${staggerIndex * 0.07}s`;
     b.addEventListener('click', onClick);
     this.container.appendChild(b);
     return b;
@@ -295,11 +309,7 @@ export class LobbyScreen {
   private toast(msg: string): void {
     const t = document.createElement('div');
     t.textContent = msg;
-    Object.assign(t.style, {
-      position: 'fixed', bottom: '32px', left: '50%', transform: 'translateX(-50%)',
-      background: '#1f2937', color: '#fff', padding: '10px 24px',
-      borderRadius: '6px', fontSize: '14px', zIndex: '600',
-    });
+    t.className = 'at-toast';
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 3000);
   }
