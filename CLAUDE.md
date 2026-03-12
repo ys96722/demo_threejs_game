@@ -24,6 +24,8 @@ TypeScript type-checking (`tsc --noEmit`) is the primary build correctness check
 
 **Game (`src/core/Game.ts`)** owns the scene graph, all systems, and the render loop. It wires everything together via the event bus. Skill effects (damage, push, etc.) are implemented here since `Game` has access to the grid, characters, and `isOccupied`. Add a new `else if` branch in the `SKILL_HIT` handler for each new skill.
 
+**Character Map key:** Characters are stored as `Map<string, Character>` keyed by `charKey(team, playerIndex)` — the string `"${team}_${playerIndex}"`. `playerIndex` is unique within a team's roster but NOT across teams; mirror-match (both players selecting the same character) is valid. Always use `charKey(this.activeTeam, idx)` for own-team lookups and `charKey(targetTeam, idx)` for cross-team lookups (e.g. TARGET_PREVIEW handlers). Never key on `playerIndex` alone.
+
 **Event-driven communication:** All cross-system communication goes through `bus` (singleton from `src/core/EventBus.ts`). Events and their payload types are defined in `src/types/events.ts` (`EVENTS` const + `EventPayloads` map). Add new events there first.
 
 **Systems** (`src/systems/`) subscribe to bus events in their constructor and must call `bus.off(...)` in their `dispose()` method. Systems receive dependencies (grid, callbacks) injected from `Game` — they do not import `Game` directly.
@@ -31,6 +33,8 @@ TypeScript type-checking (`tsc --noEmit`) is the primary build correctness check
 - `SelectionSystem` — manages character selection state, action panel UI, attack/skill targeting modes, range preview on button hover. Audio SFX calls delegate to `src/audio/GameSfx.ts`. Emits intent events only (`ATTACK_INTENT`, `SKILL_HIT`, `SPEND_ACTION_INTENT`); `Game.ts` applies all state changes.
 - `MovementSystem` — validates movement on tile click and emits `MOVE_INTENT`; does not mutate character state.
 - `RangeVisualizationSystem` — owns all tile range highlighting (reachable, attack range, hover). Subscribes to `CHARACTER_SELECTED`, `CHARACTER_DESELECTED`, `ATTACK_TARGETING_START/CANCELLED`, `SKILL_TARGETING_START/CANCELLED`, `RANGE_PREVIEW_START/END`, `CHARACTER_MOVE_START`, `TILE_HOVER_ENTER/EXIT`.
+
+`TARGET_PREVIEW_START` and `TARGET_PREVIEW_END` carry both `targetPlayerIndex` and `targetTeam` because the previewed target may be on the opposing team. Any code that emits these events must include `targetTeam`; any handler that looks up the target must use `charKey(targetTeam, targetPlayerIndex)`.
 
 **Entities** (`src/entities/`) are Three.js objects. `Character` owns a `THREE.Group` containing: a character `Sprite`, a selection glow `Sprite` (same texture, additive blending, HDR color for bloom, hidden until selected), a health bar sprite, and a token indicator sprite. Characters are not aware of the grid or bus directly.
 
@@ -178,7 +182,7 @@ EOF
 
 ### TypeScript
 - `npm run build` — tsc + vite build; must compile clean
-- `npm test` — Vitest; must pass all tests (currently 44)
+- `npm test` — Vitest; must pass all tests (currently 45)
 
 ### Python server
 - `cd server && pip install -r requirements.txt`
