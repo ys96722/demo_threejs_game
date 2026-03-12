@@ -172,8 +172,9 @@ async function main() {
   // 3. Ensure screenshots dir exists
   mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
-  const afterPath = resolve(SCREENSHOTS_DIR, 'after.png');
-  const beforePath = resolve(SCREENSHOTS_DIR, 'before.png');
+  const safeBranch = branch.replace(/[^a-zA-Z0-9._-]/g, '-');
+  const afterPath  = resolve(SCREENSHOTS_DIR, `${safeBranch}-after.png`);
+  const beforePath = resolve(SCREENSHOTS_DIR, `${safeBranch}-before.png`);
 
   // 4. Capture "after" screenshot (current branch)
   log('Capturing AFTER screenshot (current branch)…');
@@ -181,7 +182,7 @@ async function main() {
 
   // 5. Capture "before" screenshot (main branch)
   if (SKIP_BEFORE && existsSync(beforePath)) {
-    log('--skip-before: reusing existing before.png');
+    log(`--skip-before: reusing existing ${safeBranch}-before.png`);
   } else {
     log('Capturing BEFORE screenshot (main branch)…');
 
