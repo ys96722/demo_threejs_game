@@ -17,7 +17,7 @@ SRPG demo — a two-player, turn-based strategy game built with Vite + TypeScrip
 | Service | What it serves |
 |---------|---------------|
 | **GitHub Pages** | Static frontend at `yooniverse.me` |
-| **Railway** | FastAPI WebSocket server |
+| **Render** | FastAPI WebSocket server |
 
 - `public/CNAME` contains `yooniverse.me`; Vite copies it into `dist/` so GH Pages picks it up automatically.
 - GH Actions (`.github/workflows/deploy.yml`) builds and deploys to the `gh-pages` branch on every push to `main`.
@@ -33,7 +33,7 @@ All runtime URL config is centralised in `src/config/env.ts`.
 | `VITE_WS_URL` | WebSocket base for `/ws/*` | `ws://localhost:host` (uses Vite proxy) |
 | `VITE_BASE_PATH` | Vite `base` for asset paths | `'/'` |
 
-Set `VITE_API_URL` and `VITE_WS_URL` as GitHub Actions secrets (and Railway env vars) for production.
+Set `VITE_API_URL` and `VITE_WS_URL` as GitHub Actions secrets for production.
 
 ## Architecture Rules
 
@@ -57,9 +57,9 @@ Vite's dev proxy (`vite.config.ts`) routes `/lobby` and `/ws` to `localhost:8000
 ## Deploy
 
 1. Push to `main` → GH Actions runs `npm run build` and deploys `dist/` to the `gh-pages` branch.
-2. Set repo secrets: `VITE_WS_URL=wss://…railway.app`, `VITE_API_URL=https://…railway.app`.
+2. Set repo secrets: `VITE_WS_URL=wss://…onrender.com`, `VITE_API_URL=https://…onrender.com`.
 3. Set DNS CNAME `yooniverse.me → ys96722.github.io`; enable custom domain in repo Settings → Pages.
-4. Deploy server to Railway (uses `server/Procfile` for the start command).
+4. Deploy server to Render (uses `server/Procfile` for the start command — Render reads Procfiles automatically).
 
 ## Key Files
 
@@ -73,7 +73,7 @@ Vite's dev proxy (`vite.config.ts`) routes `/lobby` and `/ws` to `localhost:8000
 | `src/lobby/LobbyScreen.ts` | Lobby UI — solo/PvP menu, create/join lobby, WebSocket handshake |
 | `src/net/GameClient.ts` | In-game WebSocket client (relay and receive game events) |
 | `server/main.py` | FastAPI app — lobby REST + WebSocket relay |
-| `server/Procfile` | Railway start command |
+| `server/Procfile` | Render start command |
 | `.github/workflows/deploy.yml` | GH Actions CI/CD → GH Pages |
 | `public/CNAME` | Custom domain for GH Pages |
 

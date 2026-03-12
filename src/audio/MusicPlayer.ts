@@ -19,18 +19,34 @@ export function getMasterVolume(): number { return masterVolume; }
 
 export class MusicPlayer {
   private audio: HTMLAudioElement | null = null;
+  private pendingSrc: string | null = null;
+  private readonly resumeOnInteraction = (): void => {
+    document.removeEventListener('pointerdown', this.resumeOnInteraction);
+    if (this.pendingSrc) {
+      const src = this.pendingSrc;
+      this.pendingSrc = null;
+      this.play(src);
+    }
+  };
 
   play(src: string): void {
+    this.pendingSrc = null;
+    document.removeEventListener('pointerdown', this.resumeOnInteraction);
     this.stop();
     const audio = new Audio(src);
     audio.loop = true;
     audio.volume = masterVolume;
-    audio.play().catch(() => { /* autoplay policy — silently ignored */ });
     this.audio = audio;
     activeAudio = audio;
+    audio.play().catch(() => {
+      this.pendingSrc = src;
+      document.addEventListener('pointerdown', this.resumeOnInteraction);
+    });
   }
 
   stop(): void {
+    this.pendingSrc = null;
+    document.removeEventListener('pointerdown', this.resumeOnInteraction);
     if (!this.audio) return;
     this.audio.pause();
     this.audio.src = '';
