@@ -10,7 +10,7 @@
     "screenshot": "node scripts/screenshot.mjs",
     "create-pr": "node scripts/create-pr.mjs",
     "server": "cd server && uvicorn main:app --reload --port 8000",
-    "sync": "git checkout main && git fetch --prune --all && git branch | grep -v \"main\" | xargs git branch -d"
+    "sync": "git checkout main && git fetch --prune --all && git pull && git branch | grep -v \"main\" | xargs git branch -d"
   },
   "dependencies": {
     "three": "^0.171.0"
