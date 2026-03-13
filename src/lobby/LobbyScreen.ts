@@ -143,6 +143,14 @@ export class LobbyScreen {
         this.dispose();
         this.onGameReady({ kind: 'solo', selections, board });
       },
+      () => {
+        this.selectionScreen?.dispose();
+        this.selectionScreen = null;
+        this.container.style.display = 'flex';
+        this.phase = 'MENU';
+        this.music.play(MUSIC_FILES.LOBBY);
+        this.render();
+      },
     );
   }
 

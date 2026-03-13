@@ -21,12 +21,14 @@ export class SelectionScreen {
     * @param roster     Flat array of all available characters
     * @param ws         WebSocket for PvP; null for solo
     * @param onReady    Called with selections (team→playerIndex) and board choice
+    * @param onBack     Optional callback to return to lobby (solo only)
     */
   constructor(
     private localTeam: number | null,
     private roster: CharacterConfig[],
     private ws: WebSocket | null,
     private onReady: (selections: Record<number, number>, board: BoardType) => void,
+    private onBack?: () => void,
   ) {
     this.container = document.createElement('div');
     this.container.className = 'at-screen';
@@ -108,7 +110,7 @@ export class SelectionScreen {
     const lockBtn = document.createElement('button');
     lockBtn.textContent = 'Lock In';
     lockBtn.disabled = true;
-    lockBtn.className = 'at-btn';
+    lockBtn.className = 'at-btn at-btn-stagger';
     lockBtn.addEventListener('click', () => {
       if (selectedIdx === null) return;
       playLockInSfx();
@@ -140,6 +142,15 @@ export class SelectionScreen {
       }
     });
     this.container.appendChild(lockBtn);
+
+    if (this.onBack && this.phase === 'CHAMPION_T1') {
+      const back = document.createElement('button');
+      back.textContent = '← Back';
+      back.className = 'at-btn at-btn-stagger';
+      back.style.animationDelay = '0.07s';
+      back.addEventListener('click', () => this.onBack!());
+      this.container.appendChild(back);
+    }
   }
 
   // ---------------------------------------------------------------------------
