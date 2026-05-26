@@ -21,6 +21,8 @@ export interface CharacterConfig {
   startCoord: GridCoord;
   moveRange: number;
   spritePath: string;
+  spriteAspect?: number; // height/width ratio; defaults to 1 for square sprites
+  chromaKey?: 'green';  // use chroma-key removal instead of white-removal
   hp: number;
   strength: number;
   intellect: number;

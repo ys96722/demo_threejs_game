@@ -4,10 +4,11 @@ import { API_BASE, WS_BASE } from '../config/env';
 import { MusicPlayer, MUSIC_FILES } from '../audio/MusicPlayer';
 import { SelectionScreen } from './SelectionScreen';
 import { StoreScreen } from './StoreScreen';
+import { CharactersScreen } from './CharactersScreen';
 import { characters as allCharacters, teamSpawnCoords } from '../config/gameConfig';
 import type { CharacterConfig } from '../types/characters';
 
-type LobbyPhase = 'MENU' | 'PVP_MENU' | 'JOIN_INPUT' | 'WAITING' | 'SELECTING' | 'STORE';
+type LobbyPhase = 'MENU' | 'PVP_MENU' | 'JOIN_INPUT' | 'WAITING' | 'SELECTING' | 'STORE' | 'CHARACTERS';
 
 export class LobbyScreen {
   private container: HTMLDivElement;
@@ -16,6 +17,7 @@ export class LobbyScreen {
   private music = new MusicPlayer();
   private selectionScreen: SelectionScreen | null = null;
   private storeScreen: StoreScreen | null = null;
+  private charactersScreen: CharactersScreen | null = null;
   private pvpRoster: CharacterConfig[] = [];
 
   constructor(private onGameReady: (mode: GameMode) => void) {
@@ -32,6 +34,7 @@ export class LobbyScreen {
     this.music.dispose();
     this.selectionScreen?.dispose();
     this.storeScreen?.dispose();
+    this.charactersScreen?.dispose();
     this.container.remove();
   }
 
@@ -46,8 +49,9 @@ export class LobbyScreen {
       case 'PVP_MENU':   return this.renderPvpMenu();
       case 'JOIN_INPUT': return this.renderJoinInput();
       case 'WAITING':    return this.renderWaiting('Waiting for opponent…');
-      case 'SELECTING':  return; // SelectionScreen is mounted separately
-      case 'STORE':      return; // StoreScreen is mounted separately
+      case 'SELECTING':    return; // SelectionScreen is mounted separately
+      case 'STORE':        return; // StoreScreen is mounted separately
+      case 'CHARACTERS':   return; // CharactersScreen is mounted separately
     }
   }
 
@@ -59,7 +63,8 @@ export class LobbyScreen {
       this.render();
     }, false, 1);
     this.btn('Campaign', () => this.toast('Campaign — coming soon!'), true, 2);
-    this.btn('Store', () => this.startStore(), false, 3);
+    this.btn('Characters', () => this.startCharacters(), false, 3);
+    this.btn('Store', () => this.startStore(), false, 4);
   }
 
   private renderPvpMenu(): void {
@@ -167,6 +172,26 @@ export class LobbyScreen {
     this.storeScreen = new StoreScreen(() => {
       this.storeScreen?.dispose();
       this.storeScreen = null;
+      this.container.style.display = 'flex';
+      this.phase = 'MENU';
+      this.music.play(MUSIC_FILES.LOBBY);
+      this.render();
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Characters flow
+  // ---------------------------------------------------------------------------
+
+  private startCharacters(): void {
+    this.phase = 'CHARACTERS';
+    this.render();
+    this.container.style.display = 'none';
+    this.music.stop();
+
+    this.charactersScreen = new CharactersScreen(() => {
+      this.charactersScreen?.dispose();
+      this.charactersScreen = null;
       this.container.style.display = 'flex';
       this.phase = 'MENU';
       this.music.play(MUSIC_FILES.LOBBY);

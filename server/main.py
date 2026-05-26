@@ -11,8 +11,10 @@ from pydantic import BaseModel
 from lobby_manager import lobby_manager
 from connection_manager import connection_manager
 from game_state import build_initial_game_state, available_roster
+from routes.user_routes import router as user_router
 
 app = FastAPI()
+app.include_router(user_router)
 
 app.add_middleware(
     CORSMiddleware,

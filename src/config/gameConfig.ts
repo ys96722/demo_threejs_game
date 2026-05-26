@@ -10,6 +10,7 @@ export const characters: CharacterConfig[] = [
   // Team 2
   { playerIndex: 2, team: 2, name: 'Mina',    startCoord: { col: 8, row: 6 }, moveRange: 4, spritePath: `${import.meta.env.BASE_URL}textures/mina_base.png`,    hp: 100, strength: 1,  intellect: 1, defense: 1, resistance: 1, attackRange: 1, skills: [{ name: SKILL_NAMES.ABRAZO, range: 3, targetType: 'any' as const }] },
   { playerIndex: 4, team: 2, name: 'Isma',    startCoord: { col: 8, row: 8 }, moveRange: 3, spritePath: `${import.meta.env.BASE_URL}textures/isma_base.png`,    hp: 130, strength: 4,  intellect: 5, defense: 5, resistance: 4, attackRange: 1, skills: [] },
+  { playerIndex: 5, team: 1, name: 'Astraea', startCoord: { col: 1, row: 5 }, moveRange: 4, spritePath: `${import.meta.env.BASE_URL}textures/astraea_base.png`, hp: 80,  strength: 4,  intellect: 12, defense: 1, resistance: 3, attackRange: 3, spriteAspect: 1.5, chromaKey: 'green' as const, skills: [] },
 ];
 
 export const gameConfig = {
