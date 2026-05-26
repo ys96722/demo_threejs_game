@@ -37,47 +37,43 @@ const loader = new THREE.TextureLoader();
 //
 // Colored clothing, skin tones, and shaded areas fail at least one condition
 // and are kept fully opaque.
-function loadTransparentTexture(url: string): THREE.Texture {
+function loadTransparentTexture(url: string, chromaKey?: 'green'): THREE.Texture {
   return loader.load(url, (texture) => {
     const image = texture.image as HTMLImageElement;
-
-    // Draw the loaded image onto an off-screen canvas so we can read and
-    // modify individual pixels via getImageData / putImageData.
     const canvas = document.createElement('canvas');
     canvas.width = image.width;
     canvas.height = image.height;
     const ctx = canvas.getContext('2d')!;
     ctx.drawImage(image, 0, 0);
 
-    // imageData.data is a flat Uint8ClampedArray laid out as:
-    //   [R, G, B, A,  R, G, B, A,  ...]
-    // so every pixel occupies 4 consecutive indices; we step by 4.
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const { data } = imageData;
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i], g = data[i + 1], b = data[i + 2];
 
-      // Brightness: how light is this pixel? (0 = black, 1 = white)
-      const maxC = Math.max(r, g, b);
-      const brightness = maxC / 255;
-
-      // Saturation: how colorful is this pixel? (0 = grey, 1 = vivid color)
-      // Guard against dividing by zero when the pixel is pure black (maxC = 0).
-      const minC = Math.min(r, g, b);
-      const saturation = maxC > 0 ? (maxC - minC) / maxC : 0;
-
-      // Erase pixels that are both light AND unsaturated — i.e. the white/grey
-      // background. Colored or dark pixels are left untouched.
-      if (brightness > 0.75 && saturation < 0.15) {
-        data[i + 3] = 0; // set alpha to fully transparent
+      if (chromaKey === 'green') {
+        // Chroma key: remove pixels where green dominates over red and blue.
+        // Only keyed-out pixels are modified — character pixels are left
+        // completely untouched to preserve original colors.
+        const greenExcess = g - Math.max(r, b);
+        if (greenExcess > 30) {
+          data[i + 3] = 0;
+        }
+      } else {
+        // White removal: erase bright, unsaturated (near-grey) pixels.
+        const maxC = Math.max(r, g, b);
+        const brightness = maxC / 255;
+        const minC = Math.min(r, g, b);
+        const saturation = maxC > 0 ? (maxC - minC) / maxC : 0;
+        if (brightness > 0.75 && saturation < 0.15) {
+          data[i + 3] = 0;
+        }
       }
     }
-
-    // Write the modified pixel data back to the canvas, then point the
-    // Three.js texture at the canvas instead of the original <img> element.
     ctx.putImageData(imageData, 0, 0);
     texture.image = canvas;
-    texture.needsUpdate = true; // tells Three.js to re-upload to the GPU
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
   });
 }
 
@@ -143,8 +139,8 @@ export class Character {
     this.group = new THREE.Group();
     this.animator = new CharacterAnimator();
 
-    const texture = loadTransparentTexture(config.spritePath);
-    const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const texture = loadTransparentTexture(config.spritePath, config.chromaKey);
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
     const sprite = new THREE.Sprite(material);
 
     // By default Three.js anchors a Sprite at its center. Setting center to
@@ -157,6 +153,7 @@ export class Character {
     sprite.position.y = gameConfig.grid.tileHeight;
 
     const s = gameConfig.character.spriteScale;
+    const aspect = config.spriteAspect ?? 1;
 
     // Compute local-group position that sits d world-units above the sprite base in screen space.
     // At elevation E the camera's up vector in world space is (0, cos E, -sin E), so advancing
@@ -182,17 +179,17 @@ export class Character {
     this.selectionGlow = new THREE.Sprite(glowMat);
     this.selectionGlow.center.set(0.5, 0);
     this.selectionGlow.position.y = gameConfig.grid.tileHeight;
-    this.selectionGlow.scale.set(s * gameConfig.character.glowScale, s * gameConfig.character.glowScale, 1);
+    this.selectionGlow.scale.set(s * gameConfig.character.glowScale, s * gameConfig.character.glowScale * aspect, 1);
     this.selectionGlow.visible = false;
     this.group.add(this.selectionGlow);
 
-    sprite.scale.set(s, s, 1);
+    sprite.scale.set(s, s * aspect, 1);
     sprite.renderOrder = 1; // draw on top of glow
     this.group.add(sprite);
 
+    const spriteH = s * aspect; // world-space height of the sprite
+
     // Health bar — canvas texture on a billboard sprite, positioned above the character sprite.
-    // The character sprite is bottom-anchored at tileHeight and scaled to s world units tall,
-    // so its top sits at roughly tileHeight + s in local y. Add a small gap above that.
     this.healthBarCanvas = document.createElement('canvas');
     this.healthBarCanvas.width = 128;
     this.healthBarCanvas.height = 16;
@@ -202,7 +199,7 @@ export class Character {
     hbSprite.renderOrder = 1;
     // Width = healthBarWidth world units, height = healthBarHeight world units (matches 128:16 canvas ratio ≈ 8:1)
     hbSprite.scale.set(gameConfig.character.healthBarWidth, gameConfig.character.healthBarHeight, 1);
-    const hbPos = aboveHead(s + 0.2);
+    const hbPos = aboveHead(spriteH + 0.2);
     hbSprite.position.set(0, hbPos.y, hbPos.z);
     this.group.add(hbSprite);
     this.drawHealthBar();
@@ -216,7 +213,7 @@ export class Character {
     this.tokenSprite = new THREE.Sprite(tokenMat);
     this.tokenSprite.renderOrder = 2;
     this.tokenSprite.scale.set(0.6, 0.24, 1);
-    const tokenPos = aboveHead(s + 0.42);
+    const tokenPos = aboveHead(spriteH + 0.42);
     this.tokenSprite.position.set(0, tokenPos.y, tokenPos.z);
     this.tokenSprite.visible = false; // hidden until this player's turn
     this.group.add(this.tokenSprite);
@@ -232,7 +229,7 @@ export class Character {
     this.previewSprite = new THREE.Sprite(previewMat);
     this.previewSprite.renderOrder = 3;
     this.previewSprite.scale.set(1.2, 0.26, 1);
-    const previewPos = aboveHead(s + 0.74);
+    const previewPos = aboveHead(spriteH + 0.74);
     this.previewSprite.position.set(0, previewPos.y, previewPos.z);
     this.previewSprite.visible = false;
     this.group.add(this.previewSprite);

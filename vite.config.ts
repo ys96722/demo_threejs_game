@@ -5,6 +5,7 @@ export default defineConfig({
   server: {
     open: true,
     proxy: {
+      '/users': 'http://localhost:8000',
       '/lobby': 'http://localhost:8000',
       '/ws': {
         target: 'ws://localhost:8000',
