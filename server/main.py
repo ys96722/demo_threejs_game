@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +18,13 @@ from routes.user_routes import router as user_router
 
 app = FastAPI()
 app.include_router(user_router)
+
+logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def on_startup() -> None:
+    import os
+    logger.info("Database URL: %s", os.environ.get("DATABASE_URL", "not set"))
 
 app.add_middleware(
     CORSMiddleware,
