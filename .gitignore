@@ -6,3 +6,5 @@ prompts/
 .env
 .env.local
 server/.env
+__pycache__/
+*.pyc
