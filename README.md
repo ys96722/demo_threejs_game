@@ -48,6 +48,19 @@ cd ..
 
 > If `pipenv` is not installed: `pip install pipenv`
 
+### 4. Set up Supabase credentials
+
+Create a `server/.env` file with your Supabase project credentials:
+
+```
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_SECRET_KEY=your-secret-key
+```
+
+Get these from your [Supabase dashboard](https://supabase.com/dashboard) under **Project Settings → API**.
+
+> `server/.env` is gitignored — never commit it.
+
 ---
 
 ## Running locally
@@ -109,6 +122,7 @@ python -m pytest
 | Frontend | Vite + TypeScript (strict) + Three.js |
 | Post-processing | Three.js EffectComposer (bloom via UnrealBloomPass) |
 | Backend | FastAPI + Python 3.9, WebSocket via `websockets` |
+| Database | Supabase (PostgreSQL) |
 | Frontend tests | Vitest (node environment) |
 | Backend tests | pytest |
 | Hosting (frontend) | GitHub Pages at `yooniverse.me` |
