@@ -48,16 +48,15 @@ cd ..
 
 > If `pipenv` is not installed: `pip install pipenv`
 
-### 4. Set up Supabase credentials
+### 4. Set up database credentials
 
-Create a `server/.env` file with your Supabase project credentials:
+Create a `server/.env` file with your Supabase database connection string:
 
 ```
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_SECRET_KEY=your-secret-key
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres
 ```
 
-Get these from your [Supabase dashboard](https://supabase.com/dashboard) under **Project Settings → API**.
+Get the connection string from your [Supabase dashboard](https://supabase.com/dashboard) under **Connect → URI**.
 
 > `server/.env` is gitignored — never commit it.
 
